@@ -1,0 +1,12 @@
+[
+  {
+    "id": "diamond-gg",
+    "title": "GG",
+    "artist": "Diamond*",
+    "audio": "songs/diamond-gg/gg.mp3",
+    "skin": "diamond-star",
+    "bpm": 135,
+    "firstBeat": 0.143,
+    "_note": "Beat grid verified 2026-09-29: 135.0 BPM, trap snare on beat 3 of each bar (accent 0.85 vs ~0.25). Charts are generated from it per difficulty."
+  }
+]

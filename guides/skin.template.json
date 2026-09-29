@@ -1,0 +1,12 @@
+{
+  "contract": 1,
+  "id": "my-joe",
+  "name": "",
+  "replaces": "karate_man/joe",
+  "style": "pixel",
+  "frame": { "scale": 4, "w": 492, "h": 572, "anchorX": 132, "anchorY": 312 },
+  "frames": "joe/celNNN.png (cel000–cel034)",
+  "artist": "",
+  "model": "",
+  "notes": ""
+}

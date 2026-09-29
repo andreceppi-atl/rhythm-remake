@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <title>Rhythm Remake</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="stage">
+      <canvas id="screen" width="240" height="160"></canvas>
+      <div id="textbox" hidden></div>
+      <div id="caption" hidden></div>
+      <div id="skip" hidden>Enter — skip practice</div>
+      <div id="menu" class="panel">
+        <h1>Karate Man</h1>
+        <p class="sub">GBA 1:1 build · placeholder art &amp; audio from the decomp</p>
+        <p id="skin-status" class="sub" hidden></p>
+        <button data-scene="scene_karate_man" class="primary">Play (with practice)</button>
+        <button data-scene="scene_karate_man_skipped_practice">Skip practice</button>
+        <div class="row">
+          <label><input type="checkbox" id="opt-autoplay" /> Autoplay</label>
+          <label><input type="checkbox" id="opt-debug" /> Timing overlay</label>
+        </div>
+        <div id="song-list" class="row" hidden></div>
+        <button id="import-song">Import song… <span class="hint">(or drop a file)</span></button>
+        <input id="import-file" type="file" accept="audio/*,.json" multiple hidden />
+        <button id="calibrate">Calibrate latency <span id="offset-label"></span></button>
+        <p class="keys">A = Space / J / Z / tap · Enter = skip · Esc = menu</p>
+      </div>
+      <div id="calib" class="panel" hidden>
+        <h2>Tap A on every click</h2>
+        <p id="calib-status">Starting…</p>
+      </div>
+      <div id="import" class="panel" hidden>
+        <h2 id="imp-title">Importing…</h2>
+        <p id="imp-status" class="sub"></p>
+        <div id="imp-controls" hidden>
+          <div class="row">
+            <span>BPM <b id="imp-bpm"></b></span>
+            <button class="mini" data-bpm="0.5">÷2</button>
+            <button class="mini" data-bpm="2">×2</button>
+          </div>
+          <div class="row">
+            <span>Offset <b id="imp-offset"></b></span>
+            <button class="mini" data-nudge="-10">−10ms</button>
+            <button class="mini" data-nudge="10">+10ms</button>
+          </div>
+          <div class="row" id="imp-diff">
+            <label><input type="radio" name="diff" value="easy" /> Easy</label>
+            <label><input type="radio" name="diff" value="normal" checked /> Normal</label>
+            <label><input type="radio" name="diff" value="hard" /> Hard</label>
+          </div>
+          <p id="imp-summary" class="sub"></p>
+          <button id="imp-play" class="primary">Play</button>
+          <div class="row">
+            <button class="mini" id="imp-save">Save chart</button>
+            <button class="mini" id="imp-back">Back</button>
+          </div>
+        </div>
+      </div>
+      <div id="drop-hint" class="panel" hidden>Drop an MP3 / WAV / M4A (and optionally its chart .json)</div>
+      <div id="results" class="panel" hidden>
+        <h2 id="res-header"></h2>
+        <div id="res-rank"></div>
+        <ul id="res-comments"></ul>
+        <p id="res-score"></p>
+        <button id="res-again" class="primary">Again</button>
+        <button id="res-menu">Menu</button>
+      </div>
+      <div id="loading" class="panel">Loading…</div>
+    </div>
+    <pre id="debug" hidden></pre>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

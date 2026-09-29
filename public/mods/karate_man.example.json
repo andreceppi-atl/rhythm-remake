@@ -1,0 +1,44 @@
+{
+  "_readme": "Copy to karate_man.json (same folder) and reload. Any key from src/games/karate-man/tuning.ts can go here; omitted keys keep the GBA defaults.",
+  "timing": {
+    "windows": {
+      "normal": {
+        "hit": [
+          -4,
+          4
+        ],
+        "barely": [
+          -8,
+          8
+        ]
+      }
+    }
+  },
+  "physics": {
+    "highHit": {
+      "vx": 10,
+      "vy": -3,
+      "gravity": 0.05,
+      "spin": -24
+    }
+  },
+  "flow": {
+    "highAt": 2
+  },
+  "colors": {
+    "bg": {
+      "5:2": "#1b1030",
+      "5:3": "#1b1030",
+      "6:2": "#3a1c5c",
+      "6:3": "#1b1030",
+      "7:2": "#1b1030",
+      "7:3": "#3a1c5c"
+    },
+    "obj": {
+      "1:15": "#ffe4c4"
+    }
+  },
+  "text": {
+    "D_0805ad80": "\nLet's go!!"
+  }
+}

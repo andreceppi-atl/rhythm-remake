@@ -1,0 +1,9 @@
+node_modules/
+dist/
+# Nintendo-derived data: local reference/placeholder only, never commit or ship
+decomp-cache/
+public/gba/
+reference/rips/
+reference/specs/
+reference/handoff/
+.vercel

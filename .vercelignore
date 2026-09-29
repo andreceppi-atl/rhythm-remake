@@ -1,0 +1,9 @@
+# Uploaded to the password-protected deploy: public/gba (built locally from the decomp).
+# Never uploaded: raw decomp cache, rips, spec renders, handoff bundles.
+node_modules
+dist
+decomp-cache
+reference/rips
+reference/specs
+reference/handoff
+public/gba/power_calligraphy

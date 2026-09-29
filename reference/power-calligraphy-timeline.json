@@ -1,0 +1,438 @@
+{
+ "source": "rhythmtengoku decomp games/power_calligraphy (GBA). ms from start of main script (bgm1 starts at ~0ms after 6-tick offset).",
+ "hitWindowFramesAt60fps": {
+  "hit": [
+   -4,
+   4
+  ],
+  "barely": [
+   -24,
+   12
+  ]
+ },
+ "mercyMisses": 2,
+ "music": [
+  {
+   "ms": 0.0,
+   "tempo": 127
+  },
+  {
+   "ms": 0.0,
+   "music": "shuji_bgm1"
+  },
+  {
+   "ms": 68149.6,
+   "tempo": 161
+  },
+  {
+   "ms": 68149.6,
+   "music": "shuji_bgm2"
+  },
+  {
+   "ms": 92000.5,
+   "tempo": 98
+  },
+  {
+   "ms": 92000.5,
+   "music": "shuji_bgm3"
+  },
+  {
+   "ms": 104245.4,
+   "music": "shuji_bgm_end"
+  }
+ ],
+ "events": [
+  {
+   "cueSfx": "funuue",
+   "ms": 9566.9
+  },
+  {
+   "kana": "RE",
+   "stroke": "RE1",
+   "spawnMs": 10039.4,
+   "hitMs": 10511.8,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "v_ha1",
+   "ms": 11456.7
+  },
+  {
+   "cueSfx": "v_ha2",
+   "ms": 12401.6
+  },
+  {
+   "cueSfx": "v_ha2",
+   "ms": 12874.0
+  },
+  {
+   "cueSfx": "v_ha3",
+   "ms": 13346.5
+  },
+  {
+   "kana": "COMMA",
+   "stroke": "COMMA1",
+   "spawnMs": 13818.9,
+   "hitMs": 14291.3,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 17126.0
+  },
+  {
+   "kana": "RE",
+   "stroke": "RE1",
+   "spawnMs": 17598.4,
+   "hitMs": 18070.9,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 20905.5
+  },
+  {
+   "kana": "CHIKARA",
+   "stroke": "CHIKARA2",
+   "spawnMs": 21378.0,
+   "hitMs": 21850.4,
+   "tempo": 127,
+   "criteria": 1
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 24685.0
+  },
+  {
+   "kana": "RE",
+   "stroke": "RE1",
+   "spawnMs": 25157.5,
+   "hitMs": 25629.9,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "v_ha1",
+   "ms": 26574.8
+  },
+  {
+   "cueSfx": "v_ha2",
+   "ms": 27519.7
+  },
+  {
+   "cueSfx": "v_ha2",
+   "ms": 27992.1
+  },
+  {
+   "cueSfx": "v_ha3",
+   "ms": 28464.6
+  },
+  {
+   "kana": "COMMA",
+   "stroke": "COMMA1",
+   "spawnMs": 28937.0,
+   "hitMs": 29409.4,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 32244.1
+  },
+  {
+   "kana": "RE",
+   "stroke": "RE1",
+   "spawnMs": 32716.5,
+   "hitMs": 33189.0,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 36023.6
+  },
+  {
+   "kana": "ONORE",
+   "stroke": "ONORE1",
+   "spawnMs": 36496.1,
+   "hitMs": 36968.5,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 39803.1
+  },
+  {
+   "kana": "CHIKARA",
+   "stroke": "CHIKARA2",
+   "spawnMs": 40275.6,
+   "hitMs": 40748.0,
+   "tempo": 127,
+   "criteria": 1
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 43582.7
+  },
+  {
+   "kana": "ONORE",
+   "stroke": "ONORE1",
+   "spawnMs": 44055.1,
+   "hitMs": 44527.6,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 47362.2
+  },
+  {
+   "kana": "RE",
+   "stroke": "RE1",
+   "spawnMs": 47834.6,
+   "hitMs": 48307.1,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 50196.9
+  },
+  {
+   "kana": "SUN",
+   "stroke": "SUN1",
+   "spawnMs": 50669.3,
+   "hitMs": 51141.7,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "kana": "SUN",
+   "stroke": "SUN2",
+   "spawnMs": 51614.2,
+   "hitMs": 52086.6,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 54921.3
+  },
+  {
+   "kana": "CHIKARA",
+   "stroke": "CHIKARA2",
+   "spawnMs": 55393.7,
+   "hitMs": 55866.1,
+   "tempo": 127,
+   "criteria": 1
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 58700.8
+  },
+  {
+   "kana": "ONORE",
+   "stroke": "ONORE1",
+   "spawnMs": 59173.2,
+   "hitMs": 59645.7,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "v_ha1",
+   "ms": 60590.6
+  },
+  {
+   "cueSfx": "v_ha2",
+   "ms": 61535.4
+  },
+  {
+   "cueSfx": "v_ha2",
+   "ms": 62007.9
+  },
+  {
+   "cueSfx": "v_ha3",
+   "ms": 62480.3
+  },
+  {
+   "kana": "COMMA",
+   "stroke": "COMMA1",
+   "spawnMs": 62952.8,
+   "hitMs": 63425.2,
+   "tempo": 127,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 64842.5
+  },
+  {
+   "kana": "KOKORO",
+   "stroke": "KOKORO1",
+   "spawnMs": 65315.0,
+   "hitMs": 65787.4,
+   "tempo": 127,
+   "criteria": 2
+  },
+  {
+   "kana": "KOKORO",
+   "stroke": "KOKORO3",
+   "spawnMs": 66732.3,
+   "hitMs": 67204.7,
+   "tempo": 127,
+   "criteria": 2
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 69640.3
+  },
+  {
+   "kana": "RE",
+   "stroke": "RE1",
+   "spawnMs": 70013.0,
+   "hitMs": 70385.6,
+   "tempo": 161,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "v_ha1",
+   "ms": 71131.0
+  },
+  {
+   "cueSfx": "v_ha2",
+   "ms": 71876.3
+  },
+  {
+   "cueSfx": "v_ha2",
+   "ms": 72249.0
+  },
+  {
+   "cueSfx": "v_ha3",
+   "ms": 72621.7
+  },
+  {
+   "kana": "COMMA",
+   "stroke": "COMMA1",
+   "spawnMs": 72994.3,
+   "hitMs": 73367.0,
+   "tempo": 161,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 75603.0
+  },
+  {
+   "kana": "CHIKARA",
+   "stroke": "CHIKARA2",
+   "spawnMs": 75975.7,
+   "hitMs": 76348.4,
+   "tempo": 161,
+   "criteria": 1
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 77839.0
+  },
+  {
+   "kana": "SUN",
+   "stroke": "SUN1",
+   "spawnMs": 78211.7,
+   "hitMs": 78584.4,
+   "tempo": 161,
+   "criteria": 0
+  },
+  {
+   "kana": "SUN",
+   "stroke": "SUN2",
+   "spawnMs": 78957.1,
+   "hitMs": 79329.7,
+   "tempo": 161,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 81565.8
+  },
+  {
+   "kana": "RE",
+   "stroke": "RE1",
+   "spawnMs": 81938.4,
+   "hitMs": 82311.1,
+   "tempo": 161,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "v_ha1",
+   "ms": 83056.4
+  },
+  {
+   "cueSfx": "v_ha2",
+   "ms": 83801.8
+  },
+  {
+   "cueSfx": "v_ha2",
+   "ms": 84174.5
+  },
+  {
+   "cueSfx": "v_ha3",
+   "ms": 84547.1
+  },
+  {
+   "kana": "COMMA",
+   "stroke": "COMMA1",
+   "spawnMs": 84919.8,
+   "hitMs": 85292.5,
+   "tempo": 161,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 87528.5
+  },
+  {
+   "kana": "ONORE",
+   "stroke": "ONORE1",
+   "spawnMs": 87901.2,
+   "hitMs": 88273.8,
+   "tempo": 161,
+   "criteria": 0
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 89391.8
+  },
+  {
+   "kana": "KOKORO",
+   "stroke": "KOKORO1",
+   "spawnMs": 89764.5,
+   "hitMs": 90137.2,
+   "tempo": 161,
+   "criteria": 2
+  },
+  {
+   "kana": "KOKORO",
+   "stroke": "KOKORO3",
+   "spawnMs": 90882.5,
+   "hitMs": 91255.2,
+   "tempo": 161,
+   "criteria": 2
+  },
+  {
+   "cueSfx": "funuue",
+   "ms": 99347.5
+  },
+  {
+   "kana": "FACE",
+   "stroke": "FACE1",
+   "spawnMs": 99959.7,
+   "hitMs": 100572.0,
+   "tempo": 98,
+   "criteria": 3
+  }
+ ]
+}
