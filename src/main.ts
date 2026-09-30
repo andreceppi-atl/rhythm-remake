@@ -12,7 +12,7 @@ import { PowerCalligraphy } from './games/power-calligraphy';
 import { loadPcTuning } from './games/power-calligraphy/tuning';
 import { PC_TEXT_EN } from './games/power-calligraphy/text-en';
 import { addYoungStonerLife, YSL_SCENE } from './games/power-calligraphy/ysl';
-import { loadHandLook } from './games/power-calligraphy/hand-look';
+import { loadDancerLook, loadHandLook } from './games/power-calligraphy/hand-look';
 import type { PcTuning } from './games/power-calligraphy/tuning';
 import type { GameData } from './gba/assets';
 
@@ -116,10 +116,11 @@ async function ensureGame(game: string) {
     if (game === 'power_calligraphy' && pcTuning) addYoungStonerLife(data, pcTuning);
     if (game === 'power_calligraphy') {
       try {
-        const look = await loadHandLook(data, `${import.meta.env.BASE_URL}skins/diamond-star/calligraphy/hand.json`);
-        (data.looks ??= {})['diamond-star'] = look;
+        const dir = `${import.meta.env.BASE_URL}skins/diamond-star/calligraphy/`;
+        const [hand, raster] = await Promise.all([loadHandLook(data, `${dir}hand.json`), loadDancerLook(data, `${dir}dancers.json`)]);
+        (data.looks ??= {})['diamond-star'] = { ...hand, raster };
       } catch (e) {
-        console.warn('Diamond* hand look not loaded:', e);
+        console.warn('Diamond* look not loaded:', e);
       }
     }
     gameCache.set(game, data);
@@ -134,7 +135,7 @@ async function play(scene: string) {
   await ensureGame(scene === CUSTOM_SCRIPT ? 'karate_man' : gameOfScene(scene));
   if (prologue && scene === YSL_SCENE) prologue.title = 'Young Stoner Life';
   else if (prologue && gameOfScene(scene) === 'power_calligraphy') prologue.title = GAME_TITLES.power_calligraphy;
-  rt.look = scene === YSL_SCENE ? 'diamond-star' : null; // Young Stoner Life uses Diamond*'s hand
+  rt.look = scene === YSL_SCENE ? 'diamond-star' : null; // Young Stoner Life uses Diamond*'s hand + dancers
   lastScene = scene;
   menu.hidden = true;
   results.hidden = true;

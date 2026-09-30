@@ -20,7 +20,7 @@ export interface GameData {
   // Extra replacement/new art keyed by cel identity (e.g. generated custom characters).
   raster?: Map<Cel, RasterCel>;
   // Alternate tiles/palettes a scene can opt into (Runtime.look), e.g. Diamond*'s calligraphy hand.
-  looks?: Record<string, { bins?: Record<string, Uint8Array>; palettes?: Record<string, number[][]> }>;
+  looks?: Record<string, { bins?: Record<string, Uint8Array>; palettes?: Record<string, number[][]>; raster?: Map<Cel, RasterCel> }>;
 }
 
 async function json<T>(url: string): Promise<T> {

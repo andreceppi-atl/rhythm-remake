@@ -77,6 +77,7 @@ export async function selftest(rt: Runtime, play: (s: string) => Promise<void>):
   check('YSL autoplay 0f: 32 hits, Superb', y0.counts.hit === 32 && y0.rank === 'superb', y0);
   const yl = await runLevel(rt, play, 'scene_pc_ysl', 9);
   check('YSL +9f: all barely (late blots)', yl.counts.barely === 32, yl);
+  check('Diamond* dancers: all 34 people cels replaced (Tezzus + Diamond*)', rt.data.looks?.['diamond-star']?.raster?.size === 34, rt.data.looks?.['diamond-star']?.raster?.size);
   const hand = (rt.data.looks?.['diamond-star'] as { stats?: { pixels: number; conflicts: number; uncovered: number; shared: number } } | undefined)?.stats;
   check("Diamond* hand: bracelets in every hand frame, no shared/conflicting tiles", !!hand && hand.pixels > 150 && !hand.conflicts && !hand.shared, hand);
 

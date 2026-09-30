@@ -104,6 +104,7 @@ export class PowerCalligraphy implements GameModule {
     ppu.loadBgTiles(data.bins['power_calligraphy_bg_tiles.4bpp'], 0);
     ppu.loadBgTiles(data.bins['power_calligraphy_bg_map.tilemap'], 0xe800);
     ppu.loadObjTiles(look?.bins?.['power_calligraphy_obj.4bpp'] ?? data.bins['power_calligraphy_obj.4bpp'], 0);
+    ppu.setRasterCels(look?.raster ? new Map([...(data.raster ?? []), ...look.raster]) : data.raster);
     ppu.loadObjTiles(data.bins['power_calligraphy_obj_dancers.4bpp'], 0x5800);
     ppu.loadPalettes('bg', pal, 0, 10);
     ppu.loadPalettes('obj', pal, 0, 14);
