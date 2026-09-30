@@ -49,6 +49,12 @@ const store = {
 function layout() {
   const s = Math.max(1, Math.floor(Math.min(innerWidth / 240, innerHeight / 160)));
   stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
+  // Canvas pixels = device pixels (at least 4 per GBA pixel), so 4x detail art lands on real pixels.
+  const k = Math.max(4, Math.round(s * (devicePixelRatio || 1)));
+  if (canvas.width !== 240 * k) {
+    canvas.width = 240 * k;
+    canvas.height = 160 * k;
+  }
 }
 addEventListener('resize', layout);
 layout();

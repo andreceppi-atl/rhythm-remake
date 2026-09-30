@@ -242,8 +242,57 @@ export class Runtime {
     }
   }
 
+  // The screen canvas can be larger than 240x160 (4x): the GBA frame is scaled up crisply, then raster sprites
+  // that carry a detail frame at that scale are drawn on top, only where their sprite is visible at 1x
+  // (so anything in front still covers them) and with the same screen fade.
+  private lowCanvas: HTMLCanvasElement | null = null;
+  private patchCanvas: HTMLCanvasElement | null = null;
+
   render(ctx2d: CanvasRenderingContext2D) {
-    ctx2d.putImageData(this.ppu.render(this.sprites.drawList()), 0, 0);
+    const frame = this.ppu.render(this.sprites.drawList());
+    const W = frame.width, H = frame.height, S = Math.round(ctx2d.canvas.width / W);
+    if (S <= 1) return ctx2d.putImageData(frame, 0, 0);
+    const low = (this.lowCanvas ??= Object.assign(document.createElement('canvas'), { width: W, height: H }));
+    low.getContext('2d')!.putImageData(frame, 0, 0);
+    ctx2d.imageSmoothingEnabled = false;
+    ctx2d.drawImage(low, 0, 0, W * S, H * S);
+
+    const owner = this.ppu.owner, fade = this.ppu.fade;
+    const fa = Math.min(1, fade.amount), fr = (fade.color >> 16) & 255, fg = (fade.color >> 8) & 255, fb = fade.color & 255;
+    for (const d of this.ppu.details) {
+      const D = d.detail, R = D.scale; // detail pixels per GBA pixel
+      const patch = new ImageData(D.w, D.h);
+      const px = patch.data;
+      let any = false;
+      for (let y = 0; y < D.h; y++) {
+        const ry = d.y * R + (d.vflip ? -(D.y0 + y) - 1 : D.y0 + y);
+        const gy = Math.floor(ry / R);
+        if (gy < 0 || gy >= H) continue;
+        for (let x = 0; x < D.w; x++) {
+          const src = (y * D.w + x) * 4;
+          if (D.rgba[src + 3] < 128) continue;
+          const gx = Math.floor((d.x * R + (d.hflip ? -(D.x0 + x) - 1 : D.x0 + x)) / R);
+          if (gx < 0 || gx >= W || owner[gy * W + gx] !== d.id) continue;
+          const dst = ((d.vflip ? D.h - 1 - y : y) * D.w + (d.hflip ? D.w - 1 - x : x)) * 4;
+          px[dst] = D.rgba[src] + (fr - D.rgba[src]) * fa;
+          px[dst + 1] = D.rgba[src + 1] + (fg - D.rgba[src + 1]) * fa;
+          px[dst + 2] = D.rgba[src + 2] + (fb - D.rgba[src + 2]) * fa;
+          px[dst + 3] = 255;
+          any = true;
+        }
+      }
+      if (!any) continue;
+      const pc = (this.patchCanvas ??= document.createElement('canvas'));
+      if (pc.width < D.w) pc.width = D.w;
+      if (pc.height < D.h) pc.height = D.h;
+      const pctx = pc.getContext('2d')!;
+      pctx.clearRect(0, 0, pc.width, pc.height);
+      pctx.putImageData(patch, 0, 0);
+      const left = d.hflip ? d.x * R - (D.x0 + D.w) : d.x * R + D.x0;
+      const top = d.vflip ? d.y * R - (D.y0 + D.h) : d.y * R + D.y0;
+      const k = S / R;
+      ctx2d.drawImage(pc, 0, 0, D.w, D.h, Math.round(left * k), Math.round(top * k), Math.round(D.w * k), Math.round(D.h * k));
+    }
   }
 
   private updateFade() {
@@ -277,6 +326,7 @@ export class Runtime {
         this.sound.playMusic(scriptName(a), { at: t, volume: this.musicVolume });
         return true;
       case 'play_sfx':
+        if (a === 0 || a === '0' || a === 'NULL') return true; // play_sfx NULL: a no-op on the GBA
         this.sound.play(scriptName(a), { at: t, loop: false });
         return true;
       case 'play_audio':

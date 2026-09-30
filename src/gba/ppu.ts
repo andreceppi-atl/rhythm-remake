@@ -68,6 +68,10 @@ export class Ppu {
   readonly image = new ImageData(SCREEN_W, SCREEN_H);
   private readonly out = new Uint32Array(this.image.data.buffer);
   private readonly prio = new Uint8Array(SCREEN_W * SCREEN_H);
+  // Which sprite drew each pixel last (index in the frame's draw order + 1, 0 = background), and the raster
+  // sprites that carry a hi-res detail frame: the 4x pass draws detail only where its sprite is visible.
+  readonly owner = new Uint16Array(SCREEN_W * SCREEN_H);
+  details: { detail: NonNullable<RasterCel['detail']>; x: number; y: number; hflip: boolean; vflip: boolean; id: number }[] = [];
   private readonly celCache = new Map<string, CelBitmap>();
   private celIds = new WeakMap<Cel, number>();
   private nextCelId = 1;
@@ -180,6 +184,9 @@ export class Ppu {
     const { out, prio, bgPal, objPal } = this;
     out.fill(rgbToAbgr(bgPal[0]));
     prio.fill(4);
+    const owner = this.owner;
+    owner.fill(0);
+    this.details = [];
 
     // BG layers: lowest priority (highest number) first; for equal priority, higher layer index is behind.
     const order = [0, 1, 2, 3]
@@ -208,11 +215,13 @@ export class Ppu {
 
     // Sprites: larger z is further back, so draw descending z; later-created on top for ties.
     const sorted = [...sprites].sort((a, b) => b.z - a.z || a.order - b.order);
-    for (const s of sorted) {
+    sorted.forEach((s, n) => {
+      const id = n + 1;
       const raster = this.rasterCels.get(s.cel);
       if (raster) {
-        drawRasterCel(raster, s, out, prio, SCREEN_W, SCREEN_H);
-        continue;
+        drawRasterCel(raster, s, out, prio, SCREEN_W, SCREEN_H, owner, id);
+        if (raster.detail && !s.affine) this.details.push({ detail: raster.detail, x: Math.round(s.x), y: Math.round(s.y), hflip: s.hflip, vflip: s.vflip, id });
+        return;
       }
       const bmp = this.celBitmap(s.cel, s.baseTile, s.basePalette);
       const put = (sx: number, sy: number, v: number) => {
@@ -221,6 +230,7 @@ export class Ppu {
         if (p > prio[i]) return;
         out[i] = rgbToAbgr(objPal[v & 0xff]);
         prio[i] = p;
+        owner[i] = id;
       };
       if (!s.affine) {
         const bx = Math.round(s.x), by = Math.round(s.y);
@@ -237,7 +247,7 @@ export class Ppu {
       } else {
         // Inverse-map every screen pixel in the transformed bounding box back into the cel.
         const { scale, angle } = s.affine;
-        if (scale <= 0.01) continue;
+        if (scale <= 0.01) return;
         const th = (angle / 256) * Math.PI * 2;
         const cos = Math.cos(th), sin = Math.sin(th);
         const r = Math.hypot(Math.max(-bmp.x0, bmp.x0 + bmp.w), Math.max(-bmp.y0, bmp.y0 + bmp.h)) * scale + 1;
@@ -255,7 +265,7 @@ export class Ppu {
           }
         }
       }
-    }
+    });
 
     if (this.fade.amount > 0) {
       const a = Math.min(1, this.fade.amount);

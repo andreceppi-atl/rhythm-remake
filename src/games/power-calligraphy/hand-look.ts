@@ -139,21 +139,32 @@ export function applyHandLook(data: GameData, manifest: HandLookManifest, overla
 // Dancer looks: a sheet of 1x frames (dancers.png + dancers.json), one cell per original people cel.
 // Each frame replaces its cel as raster art, anchored at the same sprite origin.
 export async function loadDancerLook(data: GameData, url: string) {
-  const manifest: { sheet: string; cells: Record<string, { x: number; y: number; w: number; h: number; ax: number; ay: number }> } =
-    await (await fetch(url)).json();
-  const img = new Image();
-  img.src = new URL(manifest.sheet, new URL(url, location.href)).href;
-  await img.decode();
-  const canvas = document.createElement('canvas');
-  canvas.width = img.naturalWidth;
-  canvas.height = img.naturalHeight;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
-  ctx.drawImage(img, 0, 0);
+  const manifest: {
+    sheet: string;
+    detail?: { sheet: string; scale: number };
+    cells: Record<string, { x: number; y: number; w: number; h: number; ax: number; ay: number }>;
+  } = await (await fetch(url)).json();
+  const sheet = async (file: string) => {
+    const img = new Image();
+    img.src = new URL(file, new URL(url, location.href)).href;
+    await img.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    ctx.drawImage(img, 0, 0);
+    return ctx;
+  };
+  const [ctx, dctx] = await Promise.all([sheet(manifest.sheet), manifest.detail ? sheet(manifest.detail.sheet) : null]);
+  const S = manifest.detail?.scale ?? 1;
   const raster = new Map<Cel, RasterCel>();
   for (const [name, c] of Object.entries(manifest.cells)) {
     const cel = data.cels[name];
     if (!cel) throw new Error(`dancers.json: no cel ${name}`);
-    raster.set(cel, { w: c.w, h: c.h, x0: -c.ax, y0: -c.ay, rgba: ctx.getImageData(c.x, c.y, c.w, c.h).data, priority: 0 });
+    const detail = dctx
+      ? { scale: S, w: c.w * S, h: c.h * S, x0: -c.ax * S, y0: -c.ay * S, rgba: dctx.getImageData(c.x * S, c.y * S, c.w * S, c.h * S).data }
+      : undefined;
+    raster.set(cel, { w: c.w, h: c.h, x0: -c.ax, y0: -c.ay, rgba: ctx.getImageData(c.x, c.y, c.w, c.h).data, priority: 0, detail });
   }
   return raster;
 }

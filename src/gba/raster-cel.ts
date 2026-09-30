@@ -6,6 +6,8 @@ export interface RasterCel {
   y0: number;
   rgba: Uint8ClampedArray;
   priority: number;
+  // Optional finer version of the same frame (scale x the pixels, same origin), drawn by the hi-res pass.
+  detail?: { scale: number; w: number; h: number; x0: number; y0: number; rgba: Uint8ClampedArray };
 }
 
 export interface RasterTransform {
@@ -23,6 +25,8 @@ export function drawRasterCel(
   priorities: Uint8Array,
   screenW: number,
   screenH: number,
+  owner?: Uint16Array,
+  id = 0,
 ) {
   const put = (sx: number, sy: number, x: number, y: number) => {
     const i = sy * screenW + sx;
@@ -37,6 +41,7 @@ export function drawRasterCel(
     const b = Math.round(cel.rgba[source + 2] * a + ((old >>> 16) & 255) * (1 - a));
     out[i] = (0xff000000 | (b << 16) | (g << 8) | r) >>> 0;
     priorities[i] = cel.priority;
+    if (owner) owner[i] = id;
   };
   const cx = Math.round(sprite.x), cy = Math.round(sprite.y);
   if (!sprite.affine) {
