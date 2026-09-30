@@ -88,12 +88,11 @@ const rt = new Runtime(ui, {
 rt.translations = { ...KARATE_TEXT_EN, ...PC_TEXT_EN };
 rt.inputOffsetMs = Number(store.get('rh.inputOffsetMs') ?? 0);
 
-const autoplayBox = $<HTMLInputElement>('opt-autoplay');
+// Autoplay is chosen per play (the Auto buttons); ?autoplay=<frames> still forces it for testing.
+const baseAutoplay = rt.autoplay;
 const debugBox = $<HTMLInputElement>('opt-debug');
-autoplayBox.checked = rt.autoplay !== null;
 debugBox.checked = params.has('debug') || store.get('rh.debug') === '1';
 debugEl.hidden = !debugBox.checked;
-autoplayBox.onchange = () => (rt.autoplay = autoplayBox.checked ? 0 : null);
 debugBox.onchange = () => {
   debugEl.hidden = !debugBox.checked;
   store.set('rh.debug', debugBox.checked ? '1' : '0');
@@ -138,7 +137,13 @@ async function ensureGame(game: string) {
   if (prologue) prologue.title = game === 'karate_man' ? theme.prologueTitle : GAME_TITLES[game];
 }
 
-async function play(scene: string) {
+let lastAuto = false;
+// `auto` comes from the menu's Play / Auto buttons; leave it out to keep rt.autoplay as is (tests set it directly).
+async function play(scene: string, auto?: boolean) {
+  if (auto !== undefined) {
+    rt.autoplay = auto ? 0 : baseAutoplay;
+    lastAuto = auto;
+  }
   await ensureGame(scene === CUSTOM_SCRIPT ? 'karate_man' : gameOfScene(scene));
   if (prologue && (scene === YSL_SCENE || scene === PC_SONG_SCENES.ysl)) prologue.title = 'Young Stoner Life';
   else if (prologue && gameOfScene(scene) === 'power_calligraphy') prologue.title = GAME_TITLES.power_calligraphy;
@@ -160,7 +165,7 @@ function toMenu() {
   ui.skipAvailable(false);
   results.hidden = true;
   menu.hidden = false;
-  menu.querySelector<HTMLButtonElement>('button')?.focus();
+  $<HTMLInputElement>('song-search').focus();
 }
 
 function showResults(s: ResultSummary) {
@@ -181,10 +186,7 @@ function showResults(s: ResultSummary) {
   $<HTMLButtonElement>('res-again').focus();
 }
 
-for (const b of menu.querySelectorAll<HTMLButtonElement>('button[data-scene]')) {
-  b.onclick = () => void play(b.dataset.scene!);
-}
-$('res-again').onclick = () => void play(lastScene);
+$('res-again').onclick = () => void play(lastScene, lastAuto);
 $('res-menu').onclick = toMenu;
 
 // ---- input ----
@@ -198,6 +200,7 @@ addEventListener('keydown', (e) => {
     e.preventDefault();
     rt.skipTutorial();
   } else if (e.code === 'Escape') {
+    if (!playing && !importPanel.hidden) importPanel.hidden = true;
     toMenu();
   }
 });
@@ -210,7 +213,8 @@ const importPanel = $('import');
 const impStatus = $('imp-status');
 const impControls = $('imp-controls');
 const dropHint = $('drop-hint');
-let imported: { name: string; buffer: AudioBuffer; base: Analysis; grid: Analysis; chart: Chart; fromFile: boolean } | null = null;
+interface ImportedSong { name: string; buffer: AudioBuffer; base: Analysis; grid: Analysis; chart: Chart; fromFile: boolean }
+let imported: ImportedSong | null = null;
 
 const difficulty = () => (document.querySelector<HTMLInputElement>('input[name=diff]:checked')?.value ?? 'normal') as Difficulty;
 
@@ -221,14 +225,14 @@ function showImport() {
   $('imp-bpm').textContent = chart.bpm.toFixed(1);
   $('imp-offset').textContent = `${(chart.firstBeat * 1000).toFixed(0)}ms`;
   const mins = Math.floor(grid.duration / 60), secs = Math.round(grid.duration % 60).toString().padStart(2, '0');
-  const game = document.querySelector<HTMLInputElement>('input[name=game]:checked')?.value ?? 'karate';
-  const what = game === 'karate' ? `${chart.cues.length} punches` : `${game === 'ysl' ? 'Young Stoner Life' : 'Calligraphy'} characters on the beat`;
   $('imp-summary').textContent =
-    `${what} · ${mins}:${secs}` +
+    `${mins}:${secs} · Karate Man: ${chart.cues.length} punches · Calligraphy: characters on the beat` +
     (imported.fromFile ? ' · loaded chart file' : '') +
     (grid.confidence < 0.25 ? ' · beat detection unsure: check the BPM (autoplay helps)' : '');
   impStatus.textContent = imported.fromFile ? '' : `beat confidence ${(grid.confidence * 100).toFixed(0)}%`;
   impControls.hidden = false;
+  $('imp-save').hidden = false;
+  renderGames(audioGames());
 }
 
 function regenerate() {
@@ -244,9 +248,12 @@ async function loadImported(buffer: AudioBuffer, name: string, chart?: Chart) {
   let grid = base;
   if (chart) grid = adjustGrid(base, chart.bpm, chart.firstBeat);
   imported = { name, buffer, base, grid, chart: chart ?? generateChart(base, difficulty(), name), fromFile: !!chart };
+  importedSongs.splice(0, importedSongs.length, ...importedSongs.filter((i) => i.name !== name), imported);
+  renderSongList();
   showImport();
 }
 
+// ---- song-first menu: pick a song, then a game (Play / Auto) ----
 // Built-in songs (public/songs/index.json): audio + a verified beat grid.
 interface SongEntry {
   id: string;
@@ -257,7 +264,89 @@ interface SongEntry {
   bpm: number;
   firstBeat: number;
 }
+// A game on the song screen. Originals start their own scenes; audio songs build a level from the song.
+interface GameRow { label: string; hint?: string; play: (auto: boolean) => Promise<void>; practice?: () => Promise<void> }
+interface MenuSong { key: string; title: string; artist: string; open: () => void }
+
+const ORIGINALS: { title: string; games: { label: string; scene: string; skip?: string; hint?: string }[] }[] = [
+  { title: 'Karate Man', games: [{ label: 'Karate Man', scene: 'scene_karate_man', skip: 'scene_karate_man_skipped_practice' }] },
+  {
+    title: 'Power Calligraphy',
+    games: [
+      { label: 'Power Calligraphy', scene: 'scene_power_calligraphy', skip: 'scene_power_calligraphy_skipped_practice' },
+      { label: 'Young Stoner Life', scene: YSL_SCENE, hint: '若 少 石 草 生' },
+    ],
+  },
+];
 let songs: SongEntry[] = [];
+const importedSongs: ImportedSong[] = [];
+
+function songScreen(title: string, status: string) {
+  menu.hidden = true;
+  results.hidden = true;
+  importPanel.hidden = false;
+  impControls.hidden = true;
+  $('imp-save').hidden = true;
+  $('imp-title').textContent = title;
+  impStatus.textContent = status;
+  $('song-games').replaceChildren();
+}
+
+function renderGames(rows: GameRow[]) {
+  const box = $('song-games');
+  box.replaceChildren(
+    ...rows.map((g) => {
+      const row = document.createElement('div');
+      row.className = 'game-row';
+      const name = document.createElement('span');
+      name.textContent = g.label;
+      const btn = (label: string, cls: string, fn: () => Promise<void>, title: string) => {
+        const b = document.createElement('button');
+        b.className = `mini ${cls}`;
+        b.textContent = label;
+        b.title = title;
+        b.onclick = () => void fn();
+        return b;
+      };
+      row.append(
+        name,
+        btn('Play', 'primary', () => g.play(false), `Play ${g.label}`),
+        btn('Auto', '', () => g.play(true), `Watch ${g.label} on autoplay`),
+      );
+      if (g.practice) row.append(btn('Practice', '', g.practice, `${g.label} with the practice first`));
+      if (g.hint) {
+        const h = document.createElement('span');
+        h.className = 'hint';
+        h.textContent = g.hint;
+        row.append(h);
+      }
+      return row;
+    }),
+  );
+  box.querySelector<HTMLButtonElement>('button')?.focus();
+}
+
+function openOriginal(o: (typeof ORIGINALS)[number]) {
+  songScreen(o.title, 'original soundtrack');
+  renderGames(
+    o.games.map((g) => ({
+      label: g.label,
+      hint: g.hint,
+      // Play and Auto start at the real level; Practice runs the tutorial first.
+      play: (auto) => play(g.skip ?? g.scene, auto),
+      practice: g.skip ? () => play(g.scene) : undefined,
+    })),
+  );
+}
+
+// Games for an audio song (built-in or imported): each builds its level from the song's beat grid.
+function audioGames(): GameRow[] {
+  return [
+    { label: 'Karate Man', play: (auto) => playImported('karate', auto) },
+    { label: 'Power Calligraphy', play: (auto) => playImported('pc', auto) },
+    { label: 'Young Stoner Life', hint: 'as Diamond* + Tezzus', play: (auto) => playImported('ysl', auto) },
+  ];
+}
 
 async function openSong(song: SongEntry) {
   if (song.skin && params.get('skin') !== song.skin) {
@@ -265,12 +354,7 @@ async function openSong(song: SongEntry) {
     location.search = `?skin=${encodeURIComponent(song.skin)}&song=${encodeURIComponent(song.id)}`;
     return;
   }
-  menu.hidden = true;
-  results.hidden = true;
-  importPanel.hidden = false;
-  impControls.hidden = true;
-  $('imp-title').textContent = `${song.title} · ${song.artist}`;
-  impStatus.textContent = 'Loading…';
+  songScreen(`${song.title} · ${song.artist}`, 'Loading…');
   try {
     const actx = rt.sound.ctx ?? new OfflineAudioContext(2, 1, 44100);
     const buffer = await actx.decodeAudioData(await (await fetch(import.meta.env.BASE_URL + song.audio)).arrayBuffer());
@@ -286,25 +370,64 @@ async function openSong(song: SongEntry) {
   }
 }
 
-async function loadSongList() {
-  try {
-    const r = await fetch(`${import.meta.env.BASE_URL}songs/index.json`, { cache: 'no-store' });
-    if (!r.ok || !r.headers.get('content-type')?.includes('json')) return;
-    songs = await r.json();
-  } catch {
-    return;
-  }
+function menuSongs(): MenuSong[] {
+  return [
+    ...ORIGINALS.map((o) => ({ key: `orig:${o.title}`, title: o.title, artist: 'original', open: () => openOriginal(o) })),
+    ...songs.map((s) => ({ key: `song:${s.id}`, title: s.title, artist: s.artist, open: () => void openSong(s) })),
+    ...importedSongs.map((i) => ({
+      key: `imp:${i.name}`,
+      title: i.name,
+      artist: 'imported',
+      open: () => {
+        imported = i;
+        songScreen(i.name, '');
+        showImport();
+      },
+    })),
+  ];
+}
+
+const search = $<HTMLInputElement>('song-search');
+function renderSongList() {
+  const q = search.value.trim().toLowerCase();
+  const found = menuSongs().filter((m) => !q || `${m.title} ${m.artist}`.toLowerCase().includes(q));
   const list = $('song-list');
   list.replaceChildren(
-    ...songs.map((s) => {
+    ...found.map((m) => {
       const b = document.createElement('button');
       b.className = 'song';
-      b.textContent = `♪ ${s.title} · ${s.artist}`;
-      b.onclick = () => void openSong(s);
+      const t = document.createElement('span');
+      t.textContent = `♪ ${m.title}`;
+      const a = document.createElement('span');
+      a.className = 'artist';
+      a.textContent = m.artist;
+      b.append(t, a);
+      b.onclick = m.open;
       return b;
     }),
   );
-  list.hidden = songs.length === 0;
+  if (!found.length) {
+    const e = document.createElement('div');
+    e.className = 'empty';
+    e.textContent = 'No songs match. Import one?';
+    list.append(e);
+  }
+  return found;
+}
+search.oninput = () => void renderSongList();
+search.onkeydown = (e) => {
+  if (e.key === 'Enter') renderSongList()[0]?.open();
+  else if (e.key === 'ArrowDown') $('song-list').querySelector<HTMLButtonElement>('button')?.focus();
+};
+
+async function loadSongList() {
+  try {
+    const r = await fetch(`${import.meta.env.BASE_URL}songs/index.json`, { cache: 'no-store' });
+    if (r.ok && r.headers.get('content-type')?.includes('json')) songs = await r.json();
+  } catch {
+    // no built-in songs
+  }
+  renderSongList();
   const wanted = songs.find((s) => s.id === params.get('song'));
   if (wanted) void openSong(wanted);
 }
@@ -376,7 +499,6 @@ for (const b of importPanel.querySelectorAll<HTMLButtonElement>('[data-nudge]'))
   };
 }
 for (const r of importPanel.querySelectorAll<HTMLInputElement>('input[name=diff]')) r.onchange = regenerate;
-for (const r of importPanel.querySelectorAll<HTMLInputElement>('input[name=game]')) r.onchange = showImport;
 $('imp-back').onclick = () => {
   importPanel.hidden = true;
   toMenu();
@@ -389,11 +511,8 @@ $('imp-save').onclick = () => {
   a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 };
-$('imp-play').onclick = () => void playImported();
-
-async function playImported() {
+async function playImported(game: 'karate' | CalligraphySet = 'karate', auto?: boolean) {
   if (!imported) return;
-  const game = (document.querySelector<HTMLInputElement>('input[name=game]:checked')?.value ?? 'karate') as 'karate' | CalligraphySet;
   if (game !== 'karate') {
     // Power Calligraphy / Young Stoner Life: the level's own characters laid on the song's bars.
     await ensureGame('power_calligraphy');
@@ -402,7 +521,7 @@ async function playImported() {
     Object.assign(rt.data.level.scenes, level.scenes);
     rt.customAudio = imported.buffer;
     importPanel.hidden = true;
-    await play(PC_SONG_SCENES[game]);
+    await play(PC_SONG_SCENES[game], auto);
     return;
   }
   await ensureGame('karate_man');
@@ -412,7 +531,7 @@ async function playImported() {
   Object.assign(rt.translations, CUSTOM_TEXT);
   rt.customAudio = imported.buffer;
   importPanel.hidden = true;
-  await play(CUSTOM_SCRIPT);
+  await play(CUSTOM_SCRIPT, auto);
 }
 
 // ---- latency calibration: tap along to 16 clicks, use the median offset ----
@@ -506,7 +625,7 @@ function frame() {
   skinStatus.hidden = !skinStatus.textContent;
   skinStatus.setAttribute('role', data.skinWarning ? 'alert' : 'status');
   $('loading').hidden = true;
-  menu.querySelector<HTMLButtonElement>('button')?.focus();
+  search.focus();
   requestAnimationFrame(frame);
   void loadSongList();
   // Keep a failed request's fallback notice visible before the player starts.

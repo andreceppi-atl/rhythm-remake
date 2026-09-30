@@ -22,7 +22,7 @@ URL flags: `?debug` (timing overlay), `?autoplay=0` (press every cue at +0f; any
 
 ## Imported songs (auto-chart)
 
-Menu → **Import song…**, or drop an MP3/WAV/M4A on the page. `src/autochart/` does the rest:
+Menu → **+ Import song**, or drop an MP3/WAV/M4A on the page. `src/autochart/` does the rest:
 - `analyze.ts`: onset envelope (log-spectral flux), tempo (autocorrelation + fine BPM/phase search), downbeat (kick energy), loudness per bar. Assumes a steady tempo. Tested at 94–150 BPM within ±5 ms, and on `karate_bgm` at 119.99 BPM, 0.3 ms off.
 - `chart.ts`: Karate-Man-feel charts: 4-bar phrases by loudness and difficulty, quiet bars rest, a bomb on section drops, rocks on loud downbeats, bulbs on offbeats.
 - `level.ts`: chart → beatscript, so the normal engine, judge and results run it.
@@ -59,7 +59,7 @@ src/engine/runtime.ts ── sequencer.ts (beatscript) ── gameplay.ts (cue j
    - `engineEvent(id, param)`: the `<g>_engine_events[]` table in order.
    - `commonEvent(0 beat anim | 1 display text | 2 init tutorial)` and `inputEvent()` for stray presses.
    - Keep the fixed-point 24.8 math and constants verbatim. Karate Man shows the pattern.
-4. Register it in `src/main.ts` (`rt.register(new X())`) and add menu buttons for its scenes (`level.scenes`).
+4. Register it in `src/main.ts` (`rt.register(new X())`) and add it to the song-first menu: an entry in `ORIGINALS` in `src/main.ts` (its scenes from `level.scenes`), and a row in `audioGames()` if it can play imported songs.
 5. English text: add a `text-en.ts` keyed by the `D_xxxxxxx` labels and assign it to `rt.translations`.
 6. Verify (below).
 

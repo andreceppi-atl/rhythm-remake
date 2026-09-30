@@ -17,7 +17,7 @@ npm run dev                    # http://localhost:5185
 ```
 
 - `?skin=diamond-star` plays as Diamond\*. `?song=diamond-gg` opens GG.
-- **Import song…** on the menu (or drag-and-drop an MP3/WAV) auto-charts any song.
+- The menu is song-first: search or pick a song (the originals, GG, or **+ Import song** / drag-and-drop an MP3/WAV), then pick a game. Every game has **Play** and **Auto** (autoplay). Imported songs auto-chart for Karate Man, Power Calligraphy and Young Stoner Life.
 - `?manual&selftest` runs the timing and judgement checks.
 
 ## Docs

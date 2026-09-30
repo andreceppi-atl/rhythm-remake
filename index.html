@@ -19,30 +19,15 @@
         <h1>Karate Man</h1>
         <p class="sub">GBA 1:1 build · placeholder art &amp; audio from the decomp</p>
         <p id="skin-status" class="sub" hidden></p>
-        <div class="game-row">
-          <span>Karate Man</span>
-          <button data-scene="scene_karate_man" class="mini primary">Play</button>
-          <button data-scene="scene_karate_man_skipped_practice" class="mini">Skip practice</button>
-        </div>
-        <div class="game-row">
-          <span>Power Calligraphy</span>
-          <button data-scene="scene_power_calligraphy" class="mini primary">Play</button>
-          <button data-scene="scene_power_calligraphy_skipped_practice" class="mini">Skip practice</button>
-        </div>
-        <div class="game-row">
-          <span>Young Stoner Life</span>
-          <button data-scene="scene_pc_ysl" class="mini primary">Play</button>
-          <span class="hint">若 少 石 草 生</span>
-        </div>
+        <input id="song-search" type="search" placeholder="Search songs…" autocomplete="off" spellcheck="false" />
+        <div id="song-list"></div>
         <div class="row">
-          <label><input type="checkbox" id="opt-autoplay" /> Autoplay</label>
-          <label><input type="checkbox" id="opt-debug" /> Timing overlay</label>
+          <button class="mini" id="import-song">+ Import song</button>
+          <button class="mini" id="calibrate">Calibrate <span id="offset-label"></span></button>
+          <label><input type="checkbox" id="opt-debug" /> Timing</label>
         </div>
-        <div id="song-list" class="row" hidden></div>
-        <button id="import-song">Import song… <span class="hint">(or drop a file)</span></button>
         <input id="import-file" type="file" accept="audio/*,.json" multiple hidden />
-        <button id="calibrate">Calibrate latency <span id="offset-label"></span></button>
-        <p class="keys">A = Space / J / Z / tap · Enter = skip · Esc = menu</p>
+        <p class="keys">Pick a song, then a game · A = Space / J / Z / tap · Enter = skip · Esc = back</p>
       </div>
       <div id="calib" class="panel" hidden>
         <h2>Tap A on every click</h2>
@@ -56,16 +41,9 @@
             <span>BPM <b id="imp-bpm"></b></span>
             <button class="mini" data-bpm="0.5">÷2</button>
             <button class="mini" data-bpm="2">×2</button>
-          </div>
-          <div class="row">
             <span>Offset <b id="imp-offset"></b></span>
             <button class="mini" data-nudge="-10">−10ms</button>
             <button class="mini" data-nudge="10">+10ms</button>
-          </div>
-          <div class="row" id="imp-game">
-            <label><input type="radio" name="game" value="karate" checked /> Karate Man</label>
-            <label><input type="radio" name="game" value="pc" /> Calligraphy</label>
-            <label><input type="radio" name="game" value="ysl" /> Young Stoner Life</label>
           </div>
           <div class="row" id="imp-diff">
             <label><input type="radio" name="diff" value="easy" /> Easy</label>
@@ -73,11 +51,11 @@
             <label><input type="radio" name="diff" value="hard" /> Hard</label>
           </div>
           <p id="imp-summary" class="sub"></p>
-          <button id="imp-play" class="primary">Play</button>
-          <div class="row">
-            <button class="mini" id="imp-save">Save chart</button>
-            <button class="mini" id="imp-back">Back</button>
-          </div>
+        </div>
+        <div id="song-games"></div>
+        <div class="row">
+          <button class="mini" id="imp-save" hidden>Save chart</button>
+          <button class="mini" id="imp-back">Back</button>
         </div>
       </div>
       <div id="drop-hint" class="panel" hidden>Drop an MP3 / WAV / M4A (and optionally its chart .json)</div>
