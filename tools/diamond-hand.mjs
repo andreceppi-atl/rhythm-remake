@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Diamond*'s calligraphy hand: same pose as the original, plus his jewelry and skin tone.
+// Diamond*'s calligraphy hand: same pose as the original, plus his skin tone and wrist bracelets.
 //   node tools/diamond-hand.mjs
 // Writes public/skins/diamond-star/calligraphy/:
 //   hand-overlay.png  1x pixels to add, in the hand's frame (cel 128's sprite origin + hand.json origin)
@@ -55,8 +55,6 @@ const isSkin = (x, y) => at(x, y) === 3 || at(x, y) === 7;
 // ---- the overlay, drawn in the hand's frame ----
 const art = new Map();
 const put = (x, y, c) => art.set(`${x},${y}`, c);
-const stamp = (rows, ox, oy, key) =>
-  rows.forEach((r, y) => [...r].forEach((ch, x) => ch !== '.' && put(ox + x, oy + y, key[ch])));
 
 // Wrist: the forearm runs down-right; bands are perpendicular to it, clipped to the skin.
 // t = distance along the arm from the wrist line, s = position across the arm.
@@ -67,7 +65,7 @@ for (const k of base.keys()) {
   const [x, y] = k.split(',').map(Number);
   if (!isSkin(x, y)) continue;
   const t = tOf(x, y), s = sOf(x, y);
-  // Watch strap: brushed silver bracelet, 5 px, darker edges.
+  // Silver bracelet (the watch band, no watch head): brushed links, 5 px, darker edges.
   if (t >= 0 && t < 5) put(x, y, t < 1 || t >= 4 ? C.dark : (Math.floor(s) % 3 === 0 ? C.gold : C.silver));
   // Iced-out Cuban link: 5 px, chunky interlocking links (alternating diagonal ovals) with stones.
   else if (t >= 7.5 && t < 12.5) {
@@ -78,56 +76,7 @@ for (const k of base.keys()) {
   } else if ((t >= 5 && t < 5.9) || (t >= 12.5 && t < 13.4)) put(x, y, C.shade); // contact shadow on the skin
 }
 
-// Watch head: square silver block, dark dial, iced bezel. Sits on the back of the wrist (top side).
-stamp(
-  [
-    '.9999999.',
-    '966666669',
-    '96fwfwf69',
-    '96d...d69',
-    '96w.o.w69',
-    '96d...d69',
-    '96fwfwf69',
-    '966666669',
-    '.9999999.',
-  ].map((r) => r.replace(/\./g, 'x').replace(/^x|x$/g, '.')),
-  41, -8,
-  { 9: C.dark, 6: C.silver, f: C.gold, w: C.white, d: C.ice, x: C.face, o: C.silver },
-);
-// Dial hands: tiny silver tick at 12 and 3.
-put(45, -5, C.silver);
-put(46, -4, C.silver);
-
-// Middle finger (2nd knuckle from the top, left of the brush): blocky signet, pavé diamonds.
-stamp(
-  ['966669',
-   '6wdwd9',
-   '6dwdw9',
-   '6wdwd9',
-   '999999'],
-  -12, -32,
-  { 9: C.dark, 6: C.silver, w: C.white, d: C.ice },
-);
-// Band continues under the finger toward the brush.
-for (const [x, y] of [[-6, -29], [-6, -28], [-5, -28], [-5, -27], [-4, -27]]) if (isSkin(x, y)) put(x, y, C.silver);
-
-// Pinky (bottom knuckle): big diamond star, sticking out past the finger like the real thing.
-stamp(
-  ['....9....',
-   '...9w9...',
-   '...9d9...',
-   '999dwd999',
-   '9wddwddd9',
-   '.9ddddd9.',
-   '..9dwd9..',
-   '.9dd9dd9.',
-   '.9d9.9d9.',
-   '.99...99.'],
-  -14, -18,
-  { 9: C.dark, w: C.white, d: C.ice },
-);
-// Pinky band.
-for (const [x, y] of [[-6, -12], [-5, -12], [-4, -12], [-5, -11], [-4, -11]]) if (isSkin(x, y)) put(x, y, C.silver);
+// Rings and the watch head were removed at Andre's request (2026-09-30): wrist bands only.
 
 // ---- write overlay + json ----
 let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;

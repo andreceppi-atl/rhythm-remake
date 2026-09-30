@@ -78,7 +78,7 @@ export async function selftest(rt: Runtime, play: (s: string) => Promise<void>):
   const yl = await runLevel(rt, play, 'scene_pc_ysl', 9);
   check('YSL +9f: all barely (late blots)', yl.counts.barely === 32, yl);
   const hand = (rt.data.looks?.['diamond-star'] as { stats?: { pixels: number; conflicts: number; uncovered: number; shared: number } } | undefined)?.stats;
-  check("Diamond* hand: jewelry in every hand frame, no shared/conflicting tiles", !!hand && hand.pixels > 300 && !hand.conflicts && !hand.shared, hand);
+  check("Diamond* hand: bracelets in every hand frame, no shared/conflicting tiles", !!hand && hand.pixels > 150 && !hand.conflicts && !hand.shared, hand);
 
   // Sequencer timing vs the reference timeline extracted from the decomp (Power Calligraphy).
   try {
