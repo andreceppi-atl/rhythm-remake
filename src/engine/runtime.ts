@@ -228,6 +228,7 @@ export class Runtime {
     this.gameplay.update(this.now, this.manual ? this.now : heardNow);
     this.game?.update();
     this.sprites.update();
+    this.ppu.stepPaletteFades();
     this.updateFade();
 
     if (!this.sequencer.running && !this.finished) {
@@ -278,6 +279,9 @@ export class Runtime {
         return true;
       case 'play_audio':
         if (this.customAudio) this.sound.playBuffer(this.customAudio, t, this.musicVolume / 256);
+        return true;
+      case 'play_sfx_vol':
+        this.sound.play(scriptName(a), { at: t, volume: Number(b), loop: false });
         return true;
       case 'play_sfx_vol_pitch':
         this.sound.play(scriptName(c), { at: t, volume: Number(a), pitch: Number(b), loop: false });

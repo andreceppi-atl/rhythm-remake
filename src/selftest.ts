@@ -57,6 +57,21 @@ export async function selftest(rt: Runtime, play: (s: string) => Promise<void>):
   const punishTicksLeft = (cue.targetTime - (cue.targetTime - 0.15)) < (12 / 24) * (60 / cue.tempo);
   check('Stray press then +2f inside 12 ticks -> barely', !!last && last.result === 1 && punishTicksLeft, last);
 
+  // Power Calligraphy judge: hit ±4f, barely −24f..+12f (lopsided), 29 strokes, mercy 2.
+  const pc = 'scene_power_calligraphy_skipped_practice';
+  const p0 = await runLevel(rt, play, pc, 0);
+  check('PC autoplay 0f: 29 hits, Superb', p0.counts.hit === 29 && p0.rank === 'superb', p0);
+  for (const o of [4, -4]) {
+    const r = await runLevel(rt, play, pc, o);
+    check(`PC ${o > 0 ? '+' : ''}${o}f: still hit`, r.counts.hit === 29, r);
+  }
+  for (const o of [5, 12, -24]) {
+    const r = await runLevel(rt, play, pc, o);
+    check(`PC ${o > 0 ? '+' : ''}${o}f: all barely`, r.counts.barely === 29, r);
+  }
+  const p13 = await runLevel(rt, play, pc, 13);
+  check('PC +13f: miss (first 2 forgiven)', p13.counts.miss === 27 && p13.counts.barely === 2, p13);
+
   // Sequencer timing vs the reference timeline extracted from the decomp (Power Calligraphy).
   try {
     const level: LevelData = await (await fetch(`${import.meta.env.BASE_URL}gba/power_calligraphy/level.json`)).json();

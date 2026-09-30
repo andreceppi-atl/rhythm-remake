@@ -111,8 +111,8 @@ export const KARATE_DEFAULTS = {
 
   // Menu, title card and results wording.
   theme: {
-    title: 'Karate Man',
-    subtitle: 'GBA 1:1 build · placeholder art & audio from the decomp',
+    title: 'Rhythm Remake',
+    subtitle: 'GBA 1:1 builds · art & audio from the decomp',
     prologueTitle: 'Karate Man',
     resultsHeader: '', // empty = the game's own ("The Master's Words")
     ranks: { try_again: 'Try Again', ok: 'OK', superb: 'Superb' },

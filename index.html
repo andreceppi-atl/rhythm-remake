@@ -19,8 +19,16 @@
         <h1>Karate Man</h1>
         <p class="sub">GBA 1:1 build · placeholder art &amp; audio from the decomp</p>
         <p id="skin-status" class="sub" hidden></p>
-        <button data-scene="scene_karate_man" class="primary">Play (with practice)</button>
-        <button data-scene="scene_karate_man_skipped_practice">Skip practice</button>
+        <div class="game-row">
+          <span>Karate Man</span>
+          <button data-scene="scene_karate_man" class="mini primary">Play</button>
+          <button data-scene="scene_karate_man_skipped_practice" class="mini">Skip practice</button>
+        </div>
+        <div class="game-row">
+          <span>Power Calligraphy</span>
+          <button data-scene="scene_power_calligraphy" class="mini primary">Play</button>
+          <button data-scene="scene_power_calligraphy_skipped_practice" class="mini">Skip practice</button>
+        </div>
         <div class="row">
           <label><input type="checkbox" id="opt-autoplay" /> Autoplay</label>
           <label><input type="checkbox" id="opt-debug" /> Timing overlay</label>

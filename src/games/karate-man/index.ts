@@ -521,7 +521,7 @@ export class PrologueCard implements GameModule {
   readonly engine = '*prologue*';
   cueIndex = [];
   private rt!: Runtime;
-  constructor(private readonly title: string) {}
+  constructor(public title: string) {}
   start(rt: Runtime) {
     this.rt = rt;
     rt.ppu.bgPal[0] = 0x000000;

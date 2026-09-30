@@ -231,3 +231,12 @@ body {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+.game-row {
+  display: grid;
+  grid-template-columns: 70px auto auto;
+  align-items: center;
+  gap: 4px;
+  font-size: 7px;
+  text-align: left;
+}

@@ -8,6 +8,10 @@ import { KARATE_TEXT_EN } from './games/karate-man/text-en';
 import { adjustGrid, analyzeAudio, type Analysis } from './autochart/analyze';
 import { generateChart, type Chart, type Difficulty } from './autochart/chart';
 import { chartToLevel, CUSTOM_SCRIPT, CUSTOM_TEXT } from './autochart/level';
+import { PowerCalligraphy } from './games/power-calligraphy';
+import { loadPcTuning } from './games/power-calligraphy/tuning';
+import { PC_TEXT_EN } from './games/power-calligraphy/text-en';
+import type { GameData } from './gba/assets';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const stage = $('stage');
@@ -71,7 +75,7 @@ const rt = new Runtime(ui, {
   manualClock: params.has('manual'),
   autoplay: autoplayParam === null ? null : Number(autoplayParam) || 0,
 });
-rt.translations = KARATE_TEXT_EN;
+rt.translations = { ...KARATE_TEXT_EN, ...PC_TEXT_EN };
 rt.inputOffsetMs = Number(store.get('rh.inputOffsetMs') ?? 0);
 
 const autoplayBox = $<HTMLInputElement>('opt-autoplay');
@@ -91,7 +95,30 @@ showOffset();
 let playing = false;
 let pinnedDebug = false; // selftest output stays on screen
 
+// Each minigame has its own converted data; load on demand and swap it into the runtime.
+const GAME_TITLES: Record<string, string> = { karate_man: 'Karate Man', power_calligraphy: 'Power Calligraphy' };
+const gameCache = new Map<string, GameData>();
+let currentGame = '';
+let prologue: PrologueCard | null = null;
+const gameOfScene = (scene: string) => (scene.startsWith('scene_power_calligraphy') ? 'power_calligraphy' : 'karate_man');
+
+async function ensureGame(game: string) {
+  if (currentGame === game) return;
+  let data = gameCache.get(game);
+  if (!data) {
+    $('loading').hidden = false;
+    $('loading').textContent = `Loading ${GAME_TITLES[game] ?? game}…`;
+    data = await loadGameData(game, game === 'karate_man' ? params.get('skin') ?? undefined : undefined);
+    gameCache.set(game, data);
+    $('loading').hidden = true;
+  }
+  await rt.load(data);
+  currentGame = game;
+  if (prologue) prologue.title = game === 'karate_man' ? theme.prologueTitle : GAME_TITLES[game];
+}
+
 async function play(scene: string) {
+  await ensureGame(scene === CUSTOM_SCRIPT ? 'karate_man' : gameOfScene(scene));
   lastScene = scene;
   menu.hidden = true;
   results.hidden = true;
@@ -338,6 +365,7 @@ $('imp-play').onclick = () => void playImported();
 
 async function playImported() {
   if (!imported) return;
+  await ensureGame('karate_man');
   const level = chartToLevel(imported.chart);
   Object.assign(rt.data.level.scripts, level.scripts);
   Object.assign(rt.data.level.structs, level.structs);
@@ -423,13 +451,15 @@ function frame() {
   const tuning = await loadTuning(params.get('skin') ?? undefined);
   theme = tuning.theme;
   rt.register(new KarateMan(tuning));
-  rt.register(new PrologueCard(theme.prologueTitle));
+  rt.register(new PowerCalligraphy(await loadPcTuning()));
+  prologue = new PrologueCard(theme.prologueTitle);
+  rt.register(prologue);
   menu.querySelector('h1')!.textContent = theme.title;
   menu.querySelector('.sub')!.textContent = theme.subtitle;
   document.title = theme.title;
   (window.__rh as Record<string, unknown>).tuning = tuning;
-  const data = await loadGameData('karate_man', params.get('skin') ?? undefined);
-  await rt.load(data);
+  await ensureGame('karate_man');
+  const data = gameCache.get('karate_man')!;
   const skinStatus = $('skin-status');
   skinStatus.textContent = data.skinWarning ?? (data.skin ? `Playing as ${data.skin.name}` : '');
   skinStatus.hidden = !skinStatus.textContent;

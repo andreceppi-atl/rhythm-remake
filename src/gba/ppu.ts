@@ -76,6 +76,32 @@ export class Ppu {
   // Screen fade (0 = none, 1 = fully covered) with an RGB colour.
   fade = { amount: 0, color: 0x000000 };
 
+  // palette_fade_to: blend a whole 16-colour palette from `from` to `to` over `frames` (in 5-bit steps).
+  private paletteFades: { dst: Uint32Array; slot: number; from: number[]; to: number[]; frames: number; t: number }[] = [];
+
+  fadePalette(target: 'bg' | 'obj', slot: number, from: number[], to: number[], frames: number) {
+    const dst = target === 'bg' ? this.bgPal : this.objPal;
+    this.paletteFades = this.paletteFades.filter((f) => !(f.dst === dst && f.slot === slot));
+    this.paletteFades.push({ dst, slot, from, to, frames: Math.max(1, Math.round(frames)), t: 0 });
+  }
+
+  stepPaletteFades() {
+    for (const f of this.paletteFades) {
+      f.t++;
+      const k = Math.min(1, f.t / f.frames);
+      for (let c = 0; c < 16; c++) {
+        const a = f.from[c] ?? 0, b = f.to[c] ?? 0;
+        let rgb = 0;
+        for (const sh of [16, 8, 0]) {
+          const v5 = Math.round((((a >> sh) & 0xff) >> 3) + ((((b >> sh) & 0xff) >> 3) - (((a >> sh) & 0xff) >> 3)) * k);
+          rgb |= ((v5 << 3) | (v5 >> 2)) << sh;
+        }
+        f.dst[f.slot * 16 + c] = rgb;
+      }
+    }
+    this.paletteFades = this.paletteFades.filter((f) => f.t < f.frames);
+  }
+
   setRasterCels(cels: ReadonlyMap<Cel, RasterCel> = new Map()) {
     this.rasterCels = new Map(cels);
   }
