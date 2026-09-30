@@ -84,6 +84,8 @@ export class PowerCalligraphy implements GameModule {
     return a;
   }
 
+  private pal!: number[][]; // palettes in use (the scene's look can swap them)
+
   private get paper() {
     return this.rt.ppu.layers[2];
   }
@@ -97,10 +99,11 @@ export class PowerCalligraphy implements GameModule {
     this.rt = rt;
     this.anims = rt.data.anims;
     const { ppu, data, sprites } = rt;
-    const pal = data.palettes.power_calligraphy_pal;
+    const look = rt.look ? data.looks?.[rt.look] : undefined;
+    const pal = (this.pal = look?.palettes?.power_calligraphy_pal ?? data.palettes.power_calligraphy_pal);
     ppu.loadBgTiles(data.bins['power_calligraphy_bg_tiles.4bpp'], 0);
     ppu.loadBgTiles(data.bins['power_calligraphy_bg_map.tilemap'], 0xe800);
-    ppu.loadObjTiles(data.bins['power_calligraphy_obj.4bpp'], 0);
+    ppu.loadObjTiles(look?.bins?.['power_calligraphy_obj.4bpp'] ?? data.bins['power_calligraphy_obj.4bpp'], 0);
     ppu.loadObjTiles(data.bins['power_calligraphy_obj_dancers.4bpp'], 0x5800);
     ppu.loadPalettes('bg', pal, 0, 10);
     ppu.loadPalettes('obj', pal, 0, 14);
@@ -276,7 +279,7 @@ export class PowerCalligraphy implements GameModule {
         return;
       case 0x08: {
         // charge glow (palette fade on OBJ palette 11)
-        const pal = this.rt.data.palettes.power_calligraphy_pal;
+        const pal = this.pal;
         const G = this.t.glow;
         const frames = this.rt.ticksToFrames(this.t.timing.chargeGlowTicks);
         if (v) this.rt.ppu.fadePalette('obj', G.slot, pal[G.charge[0]], pal[G.charge[1]], frames);

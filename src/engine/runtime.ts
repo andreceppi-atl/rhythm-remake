@@ -112,6 +112,7 @@ export class Runtime {
 
   // Script text by label; `translations` (per game, English) wins over the Japanese original.
   translations: Record<string, string> = {};
+  look: string | null = null; // key into data.looks for the next scene
   text(label: string | number) {
     return this.translations[String(label)] ?? this.data.text[String(label)] ?? '';
   }
@@ -162,6 +163,7 @@ export class Runtime {
     this.autoplayed.clear();
     this.fade = null;
     this.ppu.fade.amount = 0;
+    this.ppu.clearPaletteFades(); // a glow left mid-fade must not bleed into the next scene
     this.musicVolume = 256;
     this.sfxTempo = 0;
     this.frame = 0;

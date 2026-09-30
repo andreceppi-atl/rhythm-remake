@@ -85,6 +85,10 @@ export class Ppu {
     this.paletteFades.push({ dst, slot, from, to, frames: Math.max(1, Math.round(frames)), t: 0 });
   }
 
+  clearPaletteFades() {
+    this.paletteFades = [];
+  }
+
   stepPaletteFades() {
     for (const f of this.paletteFades) {
       f.t++;
