@@ -4,6 +4,7 @@ import type { Animation } from './sprites';
 import type { LevelData } from '../engine/sequencer';
 import type { SoundPack } from '../audio/sound';
 import { loadSkin, type LoadedSkin } from './skin';
+import type { RasterCel } from './raster-cel';
 
 export interface GameData {
   base: string;
@@ -16,6 +17,8 @@ export interface GameData {
   sound: SoundPack;
   skin?: LoadedSkin;
   skinWarning?: string;
+  // Extra replacement/new art keyed by cel identity (e.g. generated custom characters).
+  raster?: Map<Cel, RasterCel>;
 }
 
 async function json<T>(url: string): Promise<T> {

@@ -72,6 +72,12 @@ export async function selftest(rt: Runtime, play: (s: string) => Promise<void>):
   const p13 = await runLevel(rt, play, pc, 13);
   check('PC +13f: miss (first 2 forgiven)', p13.counts.miss === 27 && p13.counts.barely === 2, p13);
 
+  // Young Stoner Life (generated kanji): 生9 少5 草4 石6x2 若2 = 32 strokes; early/late variants judged normally.
+  const y0 = await runLevel(rt, play, 'scene_pc_ysl', 0);
+  check('YSL autoplay 0f: 32 hits, Superb', y0.counts.hit === 32 && y0.rank === 'superb', y0);
+  const yl = await runLevel(rt, play, 'scene_pc_ysl', 9);
+  check('YSL +9f: all barely (late blots)', yl.counts.barely === 32, yl);
+
   // Sequencer timing vs the reference timeline extracted from the decomp (Power Calligraphy).
   try {
     const level: LevelData = await (await fetch(`${import.meta.env.BASE_URL}gba/power_calligraphy/level.json`)).json();

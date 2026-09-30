@@ -95,7 +95,7 @@ export class Runtime {
 
   async load(data: GameData) {
     this.data = data;
-    this.ppu.setRasterCels(data.skin?.cels);
+    this.ppu.setRasterCels(new Map([...(data.skin?.cels ?? []), ...(data.raster ?? [])]));
     await this.sound.loadPack(data.base, data.sound);
   }
 
@@ -283,15 +283,14 @@ export class Runtime {
       case 'play_sfx_vol':
         this.sound.play(scriptName(a), { at: t, volume: Number(b), loop: false });
         return true;
-      case 'play_sfx_vol_pitch':
-        this.sound.play(scriptName(c), { at: t, volume: Number(a), pitch: Number(b), loop: false });
+      case 'play_sfx_vol_pitch': // play_sfx_vol_pitch sound, volume, pitch
+        this.sound.play(scriptName(a), { at: t, volume: Number(b), pitch: Number(c), loop: false });
         return true;
       case 'play_sfx_synced':
       case 'play_sfx_synced_pitch': {
-        const packed = Number(c ?? 0);
-        const volume = name === 'play_sfx_synced' ? Number(c) : packed & 0xffff;
-        const pitch = name === 'play_sfx_synced' ? 0 : packed >> 16;
-        this.sound.play(scriptName(a), { at: t, speed: this.tempo / Number(b), volume, pitch, loop: false });
+        // play_sfx_synced sound, baseBPM, volume / play_sfx_synced_pitch sound, baseBPM, volume, pitch
+        const pitch = name === 'play_sfx_synced_pitch' ? Number(op[4] ?? 0) : 0;
+        this.sound.play(scriptName(a), { at: t, speed: this.tempo / Number(b), volume: Number(c), pitch, loop: false });
         return true;
       }
       case 'fade_music_out': {

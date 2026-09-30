@@ -26,4 +26,6 @@ npm run dev                    # http://localhost:5185
 - [ADAPTING.md](ADAPTING.md): how the engine works, modding, auto-chart, adding a game.
 - [guides/karate-man-character-modding-guide-1.md](guides/karate-man-character-modding-guide-1.md): the frame contract for replacement characters.
 
+Custom Power Calligraphy characters (若 少 石 草 生, "Young Stoner Life") are generated from [KanjiVG](https://kanjivg.tagaini.net) stroke data, © Ulrich Apel, CC BY-SA 3.0 (`src/games/power-calligraphy/ysl/kanji-data.json`, made with `node tools/kanji-fetch.mjs`).
+
 Fan project, not affiliated with or endorsed by Nintendo.

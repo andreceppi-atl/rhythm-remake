@@ -11,6 +11,8 @@ import { chartToLevel, CUSTOM_SCRIPT, CUSTOM_TEXT } from './autochart/level';
 import { PowerCalligraphy } from './games/power-calligraphy';
 import { loadPcTuning } from './games/power-calligraphy/tuning';
 import { PC_TEXT_EN } from './games/power-calligraphy/text-en';
+import { addYoungStonerLife, YSL_SCENE } from './games/power-calligraphy/ysl';
+import type { PcTuning } from './games/power-calligraphy/tuning';
 import type { GameData } from './gba/assets';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -100,7 +102,8 @@ const GAME_TITLES: Record<string, string> = { karate_man: 'Karate Man', power_ca
 const gameCache = new Map<string, GameData>();
 let currentGame = '';
 let prologue: PrologueCard | null = null;
-const gameOfScene = (scene: string) => (scene.startsWith('scene_power_calligraphy') ? 'power_calligraphy' : 'karate_man');
+let pcTuning: PcTuning | null = null;
+const gameOfScene = (scene: string) => (scene.startsWith('scene_power_calligraphy') || scene.startsWith('scene_pc_') ? 'power_calligraphy' : 'karate_man');
 
 async function ensureGame(game: string) {
   if (currentGame === game) return;
@@ -109,6 +112,7 @@ async function ensureGame(game: string) {
     $('loading').hidden = false;
     $('loading').textContent = `Loading ${GAME_TITLES[game] ?? game}…`;
     data = await loadGameData(game, game === 'karate_man' ? params.get('skin') ?? undefined : undefined);
+    if (game === 'power_calligraphy' && pcTuning) addYoungStonerLife(data, pcTuning);
     gameCache.set(game, data);
     $('loading').hidden = true;
   }
@@ -119,6 +123,8 @@ async function ensureGame(game: string) {
 
 async function play(scene: string) {
   await ensureGame(scene === CUSTOM_SCRIPT ? 'karate_man' : gameOfScene(scene));
+  if (prologue && scene === YSL_SCENE) prologue.title = 'Young Stoner Life';
+  else if (prologue && gameOfScene(scene) === 'power_calligraphy') prologue.title = GAME_TITLES.power_calligraphy;
   lastScene = scene;
   menu.hidden = true;
   results.hidden = true;
@@ -451,7 +457,8 @@ function frame() {
   const tuning = await loadTuning(params.get('skin') ?? undefined);
   theme = tuning.theme;
   rt.register(new KarateMan(tuning));
-  rt.register(new PowerCalligraphy(await loadPcTuning()));
+  pcTuning = await loadPcTuning();
+  rt.register(new PowerCalligraphy(pcTuning));
   prologue = new PrologueCard(theme.prologueTitle);
   rt.register(prologue);
   menu.querySelector('h1')!.textContent = theme.title;
