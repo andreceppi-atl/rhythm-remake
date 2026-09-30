@@ -4,6 +4,7 @@
 import { Sequencer, type LevelData, type Op } from '../engine/sequencer';
 import type { Analysis } from './analyze';
 import type { Difficulty } from './chart';
+import { DANCERS_ON } from '../games/power-calligraphy/ysl';
 
 export const PC_SONG_SCENES = { pc: 'scene_pc_song_pc', ysl: 'scene_pc_song_ysl' } as const;
 export type CalligraphySet = keyof typeof PC_SONG_SCENES;
@@ -87,6 +88,7 @@ export function calligraphyLevel(level: LevelData, grid: Analysis, set: Calligra
   restTo(at - 24);
   ops.push(['run2', 'gameplay_run_common_event', 1, 0]);
   ops.push(['run', 'gameplay_start_perfect_campaign']);
+  if (set === 'ysl') ops.push(...DANCERS_ON); // Tezzus + Diamond* dance the whole song
   let i = 0, slots = 0;
   for (;;) {
     let next = loop[i % loop.length];
