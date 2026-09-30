@@ -105,7 +105,9 @@ let playing = false;
 let pinnedDebug = false; // selftest output stays on screen
 
 // Each minigame has its own converted data; load on demand and swap it into the runtime.
-const GAME_TITLES: Record<string, string> = { karate_man: 'Karate Man', power_calligraphy: 'Power Calligraphy' };
+const GAME_TITLES: Record<string, string> = { karate_man: 'Diamond* Chop Chop', power_calligraphy: 'Power Calligraphy' };
+// Karate Man only ships as Diamond* Chop Chop now: the Diamond* skin is always on (?skin= can still pick another).
+const KM_SKIN = params.get('skin') ?? 'diamond-star';
 const gameCache = new Map<string, GameData>();
 let currentGame = '';
 let prologue: PrologueCard | null = null;
@@ -118,7 +120,7 @@ async function ensureGame(game: string) {
   if (!data) {
     $('loading').hidden = false;
     $('loading').textContent = `Loading ${GAME_TITLES[game] ?? game}…`;
-    data = await loadGameData(game, game === 'karate_man' ? params.get('skin') ?? undefined : undefined);
+    data = await loadGameData(game, game === 'karate_man' ? KM_SKIN : undefined);
     if (game === 'power_calligraphy' && pcTuning) addYoungStonerLife(data, pcTuning);
     if (game === 'power_calligraphy') {
       try {
@@ -226,7 +228,7 @@ function showImport() {
   $('imp-offset').textContent = `${(chart.firstBeat * 1000).toFixed(0)}ms`;
   const mins = Math.floor(grid.duration / 60), secs = Math.round(grid.duration % 60).toString().padStart(2, '0');
   $('imp-summary').textContent =
-    `${mins}:${secs} · Karate Man: ${chart.cues.length} punches · Calligraphy: characters on the beat` +
+    `${mins}:${secs} · Chop Chop: ${chart.cues.length} punches · Calligraphy: characters on the beat` +
     (imported.fromFile ? ' · loaded chart file' : '') +
     (grid.confidence < 0.25 ? ' · beat detection unsure: check the BPM (autoplay helps)' : '');
   impStatus.textContent = imported.fromFile ? '' : `beat confidence ${(grid.confidence * 100).toFixed(0)}%`;
@@ -269,7 +271,7 @@ interface GameRow { label: string; hint?: string; play: (auto: boolean) => Promi
 interface MenuSong { key: string; title: string; artist: string; open: () => void }
 
 const ORIGINALS: { title: string; games: { label: string; scene: string; skip?: string; hint?: string }[] }[] = [
-  { title: 'Karate Man', games: [{ label: 'Karate Man', scene: 'scene_karate_man', skip: 'scene_karate_man_skipped_practice' }] },
+  { title: 'Diamond* Chop Chop', games: [{ label: 'Diamond* Chop Chop', scene: 'scene_karate_man', skip: 'scene_karate_man_skipped_practice' }] },
   {
     title: 'Power Calligraphy',
     games: [
@@ -342,14 +344,14 @@ function openOriginal(o: (typeof ORIGINALS)[number]) {
 // Games for an audio song (built-in or imported): each builds its level from the song's beat grid.
 function audioGames(): GameRow[] {
   return [
-    { label: 'Karate Man', play: (auto) => playImported('karate', auto) },
+    { label: 'Diamond* Chop Chop', play: (auto) => playImported('karate', auto) },
     { label: 'Power Calligraphy', play: (auto) => playImported('pc', auto) },
     { label: 'Young Stoner Life', hint: 'as Diamond* + Tezzus', play: (auto) => playImported('ysl', auto) },
   ];
 }
 
 async function openSong(song: SongEntry) {
-  if (song.skin && params.get('skin') !== song.skin) {
+  if (song.skin && KM_SKIN !== song.skin) {
     // Songs can ask for their artist's skin; skins load at startup, so reload into it.
     location.search = `?skin=${encodeURIComponent(song.skin)}&song=${encodeURIComponent(song.id)}`;
     return;
@@ -607,16 +609,16 @@ function frame() {
 
 // ---- boot ----
 (async () => {
-  const tuning = await loadTuning(params.get('skin') ?? undefined);
+  const tuning = await loadTuning(KM_SKIN);
   theme = tuning.theme;
   rt.register(new KarateMan(tuning));
   pcTuning = await loadPcTuning();
   rt.register(new PowerCalligraphy(pcTuning));
   prologue = new PrologueCard(theme.prologueTitle);
   rt.register(prologue);
-  menu.querySelector('h1')!.textContent = theme.title;
-  menu.querySelector('.sub')!.textContent = theme.subtitle;
-  document.title = theme.title;
+  // The menu is the whole app's, so it keeps the app title; the skin's theme dresses Chop Chop itself.
+  menu.querySelector('h1')!.textContent = KARATE_DEFAULTS.theme.title;
+  document.title = KARATE_DEFAULTS.theme.title;
   (window.__rh as Record<string, unknown>).tuning = tuning;
   await ensureGame('karate_man');
   const data = gameCache.get('karate_man')!;

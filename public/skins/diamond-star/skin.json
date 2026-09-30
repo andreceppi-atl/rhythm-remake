@@ -11,16 +11,16 @@
     "anchorX": 132,
     "anchorY": 312
   },
-  "frames": "joe/celNNN.png (cel000\u2013cel034)",
+  "frames": "joe/celNNN.png (cel000–cel034)",
   "artist": "Custom character based on user-provided likeness",
   "model": "Built-in OpenAI image generation; deterministic game-frame export",
   "notes": "Eight-colour GBA pixel track. Single forward dread, tied-back locs, double-rim cup in rear hand, star pendant, piercings, rings, red scarf, sagging ripped denim and red sneakers. Original game timing retained. Frame 021 (power-punch recovery) reuses the 015 extended-jab drawing; the generated 021 had a sheared torso (kept in _replaced/).",
   "tuning": {
     "_readme": "Diamond*'s world. Merged over the game's tuning when ?skin=diamond-star is used. Song titles / ad-libs go in theme + text once supplied.",
     "theme": {
-      "title": "Diamond*",
-      "subtitle": "Karate Man \u00b7 Diamond* edition",
-      "prologueTitle": "Diamond*"
+      "title": "Diamond* Chop Chop",
+      "subtitle": "Diamond* Chop Chop",
+      "prologueTitle": "Diamond* Chop Chop"
     },
     "colors": {
       "bg": {
