@@ -7,3 +7,4 @@ reference/rips/
 reference/specs/
 reference/handoff/
 .vercel
+.env*
