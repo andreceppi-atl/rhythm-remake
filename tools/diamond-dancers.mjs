@@ -1,402 +1,351 @@
 #!/usr/bin/env node
-// Power Calligraphy dancers restyled for Young Stoner Life: the man becomes Tezzus, the woman becomes Diamond*.
+// Young Stoner Life dancers: new Tezzus and Diamond* sprites drawn on the original Power Calligraphy poses.
 //   node tools/diamond-dancers.mjs
-// Same poses and animation as the original (every cel keeps its silhouette and origin); only the look changes.
-// Each original cel is split into parts (face, hands, feet, hair, top, legs, shoes) and re-coloured per character.
-// Writes public/skins/diamond-star/calligraphy/dancers.png + dancers.json (a sheet of 1x frames, one cell per cel)
-// and reference/specs/power_calligraphy/diamond-dancers_preview_8x.png (original above, restyled below).
-// dancers@4x.png is the same frames at 4x density with the fine details (all nine piercings, the GG logo, hand
-// tattoos, shades, leather scales, rips, dread strands, sherpa texture); the game draws it on a 4x canvas.
-// dancers.png can also be repainted by hand: keep each frame inside its cell, anchor at the cell's (ax, ay).
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+// The poses come from the original people cels (tools/lib/dancer-poses.mjs, one per cel), so the game plays
+// the same animation with the same frame timing; the characters themselves are new: their own proportions,
+// silhouettes and outfits, in the Rhythm Heaven GBA language (bold 1-pixel black outlines, flat colours,
+// round mitt hands, big heads, chunky shoes).
+// Drawn at 4x density (fine details: piercings, GG, tattoos, shades, scales) and reduced to a 1x occlusion mask.
+// Writes public/skins/diamond-star/calligraphy/dancers.png, dancers@4x.png, dancers.json and
+// reference/specs/power_calligraphy/diamond-dancers_preview.png.
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT } from './lib/decomp.mjs';
 import { Image } from './lib/png.mjs';
+import { POSES } from './lib/dancer-poses.mjs';
 
-const dir = join(ROOT, 'public', 'gba', 'power_calligraphy');
-const gfx = JSON.parse(readFileSync(join(dir, 'gfx.json'), 'utf8'));
-const tiles = readFileSync(join(dir, 'power_calligraphy_obj_dancers.4bpp'));
-const pal10 = gfx.palettes.power_calligraphy_pal[10];
+const D = 4; // detail pixels per game pixel
+const CELL = { w: 56, h: 46, ax: 28, ay: 42 }; // 1x cell, anchor = sprite origin
+const SCALE = 1.1; // the new characters are a little bigger than the originals
+const OL = 0.9; // outline width (game pixels)
 
-const SIZES = [
-  [[8, 8], [16, 16], [32, 32], [64, 64]],
-  [[16, 8], [32, 8], [32, 16], [64, 32]],
-  [[8, 16], [8, 32], [16, 32], [32, 64]],
-];
-function decode(cel) {
-  const px = new Map();
-  for (let i = cel.length - 1; i >= 0; i--) {
-    const [a0, a1, a2] = cel[i];
-    const y0 = ((a0 & 0xff) << 24) >> 24, x0 = ((a1 & 0x1ff) << 23) >> 23;
-    const [w, h] = SIZES[(a0 >> 14) & 3][(a1 >> 14) & 3];
-    const hf = a1 & 0x1000, vf = a1 & 0x2000, tile = a2 & 0x3ff;
-    for (let ty = 0; ty < h; ty++)
-      for (let tx = 0; tx < w; tx++) {
-        const sx = hf ? w - 1 - tx : tx, sy = vf ? h - 1 - ty : ty;
-        const b = tiles[(tile + (sy >> 3) * 32 + (sx >> 3)) * 32 + (sy & 7) * 4 + ((sx & 7) >> 1)] ?? 0;
-        const c = sx & 1 ? b >> 4 : b & 15;
-        if (c) px.set(`${x0 + tx},${y0 + ty}`, c);
-      }
-  }
-  return px;
-}
-
-const K = (x, y) => `${x},${y}`;
-const XY = (k) => k.split(',').map(Number);
-const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-const N8 = [...N4, [1, 1], [1, -1], [-1, 1], [-1, -1]];
-function components(keys, nb = N4) {
-  const left = new Set(keys), out = [];
-  for (const k of keys) {
-    if (!left.has(k)) continue;
-    left.delete(k);
-    const comp = [k];
-    for (let i = 0; i < comp.length; i++) {
-      const [x, y] = XY(comp[i]);
-      for (const [dx, dy] of nb) {
-        const n = K(x + dx, y + dy);
-        if (left.has(n)) { left.delete(n); comp.push(n); }
-      }
-    }
-    out.push(comp);
-  }
-  return out;
-}
-const bbox = (keys) => {
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const k of keys) { const [x, y] = XY(k); x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
-  return { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+// ---------- tiny vector rasterizer (coords in game pixels relative to the anchor) ----------
+const V = {
+  add: (a, b) => [a[0] + b[0], a[1] + b[1]],
+  sub: (a, b) => [a[0] - b[0], a[1] - b[1]],
+  mul: (a, k) => [a[0] * k, a[1] * k],
+  len: (a) => Math.hypot(a[0], a[1]),
+  norm: (a) => { const l = Math.hypot(a[0], a[1]) || 1; return [a[0] / l, a[1] / l]; },
+  lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t],
+  dist: (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]),
 };
-
-// Original palette 10 indices: 13 black (outline / gi), 3 skin, 11 blush + midriff, 6 red outfit, 14 white.
-const BLACK = 13, SKIN = 3, BLUSH = 11, RED = 6, WHITE = 14;
-
-// ---- per-cel fixes where the automatic split guesses wrong: [x, y, part] ----
-// parts: legs | top | hair | feet | hand
-const FIX = {};
-
-// Split one cel into labelled parts.
-function segment(n, px) {
-  const labels = new Map();
-  const skinKeys = [...px].filter(([, c]) => c === SKIN || c === BLUSH).map(([k]) => k);
-  const comps = components(skinKeys).sort((a, b) => b.length - a.length);
-  const face = new Set(comps[0]);
-  const fb = bbox(face);
-  const all = bbox(px.keys());
-  for (const k of face) labels.set(k, 'face');
-  // Hair / head outline: non-skin pixels at or above the chin, near the face.
-  for (const [k, c] of px) {
-    if (labels.has(k) || c === SKIN || c === BLUSH && face.has(k)) continue;
-    const [x, y] = XY(k);
-    if (y <= fb.y1 && x >= fb.x0 - 3 && x <= fb.x1 + 3 && !(c === WHITE)) labels.set(k, 'hair');
-  }
-  // Other skin blobs: feet if they sit at the bottom of the figure, otherwise hands (or midriff for blush).
-  for (const comp of comps.slice(1)) {
-    const b = bbox(comp);
-    const blush = comp.every((k) => px.get(k) === BLUSH);
-    const part = blush ? 'midriff' : b.y1 >= all.y1 - 3 && b.y0 >= all.y1 - 6 ? 'feet' : 'hand';
-    for (const k of comp) labels.set(k, part);
-  }
-  // Clothing: everything left. Legs vs top by which it reaches first, walking through the clothing pixels.
-  const cloth = [...px.keys()].filter((k) => !labels.has(k));
-  const clothSet = new Set(cloth);
-  const shoes = cloth.filter((k) => px.get(k) === WHITE && XY(k)[1] >= all.y1 - 4 && n >= 17);
-  for (const k of shoes) { labels.set(k, 'shoe'); clothSet.delete(k); }
-  const dist = new Map(), queue = [];
-  const seed = (k, part) => { if (clothSet.has(k) && !dist.has(k)) { dist.set(k, part); queue.push(k); } };
-  const near = (part, test) => {
-    for (const k of clothSet) {
-      const [x, y] = XY(k);
-      if (N8.some(([dx, dy]) => test(K(x + dx, y + dy)))) seed(k, part);
-    }
-  };
-  // Legs start next to feet/shoes; top starts at the lapel / midriff / hands / neck.
-  near('legs', (k) => labels.get(k) === 'feet' || labels.get(k) === 'shoe');
-  for (const k of clothSet) if (px.get(k) === WHITE) seed(k, 'top');
-  near('top', (k) => ['hand', 'midriff', 'hair', 'face'].includes(labels.get(k)));
-  for (let i = 0; i < queue.length; i++) {
-    const [x, y] = XY(queue[i]);
-    for (const [dx, dy] of N4) seed(K(x + dx, y + dy), dist.get(queue[i]));
-  }
-  for (const k of clothSet) labels.set(k, dist.get(k) ?? 'top');
-  // Standing man frames: the jacket is cropped, so everything a row or two below the tank is jeans.
-  if (n < 17 && all.y1 - all.y0 > 16) {
-    const tank = [...clothSet].filter((k) => px.get(k) === WHITE).map((k) => XY(k)[1]);
-    const waist = tank.length ? Math.max(...tank) + 2 : fb.y1 + 3;
-    for (const k of clothSet) labels.set(k, XY(k)[1] > waist ? 'legs' : 'top');
-  }
-  for (const [x, y, part] of FIX[n] ?? []) if (px.has(K(x, y))) labels.set(K(x, y), part);
-  return { labels, fb, all };
+function segDist(p, a, b) {
+  const ab = V.sub(b, a), t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1]) / ((ab[0] ** 2 + ab[1] ** 2) || 1)));
+  return { d: V.dist(p, V.add(a, V.mul(ab, t))), t };
 }
-
-const hex = (s) => parseInt(s.slice(1), 16);
-const TEZZUS = {
-  outline: '#000000', skin: '#7c4c35', ink: '#23160f', hair: '#16110f', lens: '#1c0c0f', glint: '#6a5a66',
-  jacket: '#d3272d', jacketEdge: '#7c0f14', jacketLight: '#f2645c', tank: '#f2eee4',
-  jeans: '#a9c1db', jeansEdge: '#6886a9', rip: '#eef2f6', shoe: '#c81f26',
-};
-const DIAMOND = {
-  outline: '#000000', skin: '#5c3727', hair: '#0f0c0b', fleece: '#efe6d1', tee: '#f6f5f0',
-  green: '#1e6a42', red: '#c9202a', gold: '#e3b53c', jeans: '#3b5a86', vans: '#1d1d1d', sole: '#f2f2f2', stud: '#e4ebf3',
-};
-
-function tezzus(n, px) {
-  const { labels, fb } = segment(n, px);
-  const out = new Map();
-  const has = (x, y) => px.has(K(x, y));
-  for (const [k, c] of px) {
-    const [x, y] = XY(k);
-    const part = labels.get(k);
-    const edge = N4.some(([dx, dy]) => !has(x + dx, y + dy));
-    let col;
-    const touchesSkin = N8.some(([dx, dy]) => ['hand', 'feet'].includes(labels.get(K(x + dx, y + dy))));
-    if (c === BLACK && (part === 'face' || part === 'hand' || part === 'feet')) col = TEZZUS.outline;
-    else if (c === BLACK && touchesSkin && part !== 'hair') col = TEZZUS.outline; // keep hands/feet outlined
-    else if (part === 'face') col = TEZZUS.skin;
-    else if (part === 'hand') col = TEZZUS.skin;
-    else if (part === 'feet') col = TEZZUS.shoe;
-    else if (part === 'hair') col = c === BLACK ? TEZZUS.hair : TEZZUS.skin;
-    else if (part === 'top') col = c === WHITE ? TEZZUS.tank : edge ? TEZZUS.jacketEdge : (x + 2 * y) % 4 === 0 ? TEZZUS.jacketLight : TEZZUS.jacket;
-    else if (part === 'legs') col = edge ? TEZZUS.jeansEdge : ((x * 7 + y * 3) % 11 + 11) % 11 === 0 ? TEZZUS.rip : TEZZUS.jeans;
-    else col = TEZZUS.outline;
-    out.set(k, col);
-  }
-  // Hand tattoos: one ink pixel in the middle of each hand.
-  for (const comp of components([...labels].filter(([, p]) => p === 'hand').map(([k]) => k))) {
-    if (comp.length < 4) continue;
-    const b = bbox(comp);
-    const k = K(Math.round(b.cx), Math.round(b.cy));
-    if (comp.includes(k)) out.set(k, TEZZUS.ink);
-  }
-  // Shades: eye rows (dark pixels inside the upper face) become a solid lens band.
-  const faceKeys = [...labels].filter(([, p]) => p === 'face').map(([k]) => k);
-  const rows = new Map();
-  for (let y = fb.y0; y <= fb.cy; y++) {
-    const xs = faceKeys.map(XY).filter(([, yy]) => yy === y).map(([x]) => x);
-    if (!xs.length) continue;
-    const x0 = Math.min(...xs), x1 = Math.max(...xs);
-    const eyes = [...px].filter(([k, c]) => { const [x, yy] = XY(k); return yy === y && c === BLACK && x > x0 && x < x1; });
-    if (eyes.length) rows.set(y, [x0, x1]);
-  }
-  let first = true;
-  for (const [y, [x0, x1]] of [...rows].slice(0, 2)) {
-    for (let x = x0; x <= x1; x++) out.set(K(x, y), first && x === x0 + 1 ? TEZZUS.glint : TEZZUS.lens);
-    first = false;
-  }
-  // Dreads: bushy top and a few hanging locks, outside the original silhouette.
-  const hair = [...labels].filter(([, p]) => p === 'hair').map(([k]) => k);
-  for (const k of hair) {
-    const [x, y] = XY(k);
-    if (y > fb.y0 + 2) continue;
-    if (!has(x, y - 1) && (x & 1) === 0) out.set(K(x, y - 1), TEZZUS.hair);
-    if (!has(x - 1, y) && !out.has(K(x - 1, y))) out.set(K(x - 1, y), TEZZUS.hair);
-    if (!has(x + 1, y) && !out.has(K(x + 1, y))) out.set(K(x + 1, y), TEZZUS.hair);
-  }
-  for (const x of [fb.x0 - 1, fb.x1 + 1])
-    for (let y = fb.y0; y <= fb.y0 + 3; y++) if (!out.has(K(x, y))) out.set(K(x, y), TEZZUS.hair);
-
-  // ---- 4x detail ----
-  const base = new Map(out), hi = new Map();
-  const put4 = (X, Y, col) => hi.set(K(X, Y), col);
-  const cell4 = (k, f) => { const [x, y] = XY(k); for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) f(x * 4 + i, y * 4 + j, i, j); };
-  // Jacket: overlapping leather scales (4x3 cells, rows offset), dark lower rim, light upper-left glint.
-  for (const [k, col] of out) {
-    if (col !== TEZZUS.jacket && col !== TEZZUS.jacketLight) continue;
-    base.set(k, TEZZUS.jacket);
-    cell4(k, (X, Y) => {
-      const r = Math.floor((Y + 64) / 3), cx = (X + 64 + (r & 1) * 2) % 4, cy = (Y + 64) % 3;
-      put4(X, Y, cy === 2 && cx !== 0 ? TEZZUS.jacketEdge : cy === 0 && cx === 1 ? TEZZUS.jacketLight : TEZZUS.jacket);
-    });
-  }
-  // Ripped jeans: frayed horizontal slits.
-  for (const [k, col] of out) {
-    if (col !== TEZZUS.rip) continue;
-    base.set(k, TEZZUS.jeans);
-    cell4(k, (X, Y, i, j) => put4(X, Y, (j === 1 || j === 2) && i > 0 && i < 4 ? (j === 2 && i === 2 ? TEZZUS.skin : TEZZUS.rip) : TEZZUS.jeans));
-  }
-  // Shades: shield lenses with a frame line and a light streak on each side.
-  const lensRows = [...rows.keys()].slice(0, 2);
-  for (const [k, col] of out) {
-    if (col !== TEZZUS.lens && col !== TEZZUS.glint) continue;
-    base.set(k, TEZZUS.lens);
-    const [x] = XY(k);
-    cell4(k, (X, Y, i, j) => {
-      const Yr = Y - lensRows[0] * 4, rel = X - Math.round(fb.cx * 4 + 2);
-      const streak = (Yr + Math.abs(rel)) % 6 === 2 && Yr > 0 && Yr < 7 && Math.abs(rel) > 1;
-      put4(X, Y, Yr === 0 ? TEZZUS.outline : streak ? '#8d7c8a' : TEZZUS.lens);
-    });
-  }
-  // Hand tattoos: two rows of script marks across each hand.
-  for (const comp of components([...labels].filter(([, p]) => p === 'hand').map(([k]) => k))) {
-    for (const k of comp) if (out.get(k) === TEZZUS.ink) base.set(k, TEZZUS.skin);
-    if (comp.length < 4) continue;
-    const b = bbox(comp);
-    const set = new Set(comp);
-    for (const k of comp) cell4(k, (X, Y) => {
-      const ty = Y - b.y0 * 4, tx = X - b.x0 * 4;
-      const mark = (ty === 3 || ty === 7) && tx >= 2 && tx <= (b.x1 - b.x0 + 1) * 4 - 3 && (tx + ty) % 4 !== 0;
-      const dot = ty === 5 && tx % 3 === 1;
-      if ((mark || dot) && set.has(K(Math.floor(X / 4), Math.floor(Y / 4)))) put4(X, Y, TEZZUS.ink);
-    });
-  }
-  hairStrands(out, TEZZUS.hair, put4, cell4);
-  return { out, base, hi };
-}
-
-// Dreads: vertical strands with a lighter sheen.
-function hairStrands(out, hair, put4, cell4) {
-  for (const [k, col] of out) if (col === hair) cell4(k, (X, Y) => put4(X, Y, (X + 64) % 3 === 1 ? '#3a2c26' : hair));
-}
-
-function diamond(n, px) {
-  const { labels, fb } = segment(n, px);
-  const out = new Map();
-  for (const [k, c] of px) {
-    const [x, y] = XY(k);
-    const part = labels.get(k);
-    let col;
-    if (c === BLACK && part !== 'hair') col = DIAMOND.outline;
-    else if (part === 'face' || part === 'hand' || part === 'feet') col = DIAMOND.skin;
-    else if (part === 'hair') col = c === BLACK || c === RED ? DIAMOND.hair : DIAMOND.skin;
-    else if (part === 'midriff') col = DIAMOND.tee;
-    else if (part === 'shoe') col = px.get(K(x, y + 1)) === WHITE ? DIAMOND.vans : DIAMOND.sole;
-    else if (part === 'legs') col = c === WHITE ? DIAMOND.sole : DIAMOND.jeans;
-    else if (part === 'top') col = c === BLUSH ? DIAMOND.tee : c === WHITE ? DIAMOND.tee : DIAMOND.fleece;
-    else col = DIAMOND.outline;
-    out.set(k, col);
-  }
-  // Gucci web stripe (green-red-green) down the front of the fleece, gold G on the red.
-  const top = [...labels].filter(([k, p]) => p === 'top' && px.get(k) === RED).map(([k]) => k);
-  const torso = components(top).sort((a, b) => b.length - a.length)[0];
-  if (torso && torso.length >= 12) {
-    const cx = Math.round(fb.cx);
-    const inT = new Set(torso);
-    const ys = torso.map(XY).filter(([x]) => x === cx).map(([, y]) => y).sort((a, b) => a - b);
-    ys.forEach((y, i) => {
-      if (inT.has(K(cx - 1, y))) out.set(K(cx - 1, y), DIAMOND.green);
-      out.set(K(cx, y), i === Math.floor(ys.length / 2) ? DIAMOND.gold : DIAMOND.red);
-      if (inT.has(K(cx + 1, y))) out.set(K(cx + 1, y), DIAMOND.green);
-    });
-  }
-  // ---- 4x detail ----
-  const base = new Map(out), hi = new Map();
-  const put4 = (X, Y, col) => hi.set(K(X, Y), col);
-  const cell4 = (k, f) => { const [x, y] = XY(k); for (let j = 0; j < 4; j++) for (let i = 0; i < 4; i++) f(x * 4 + i, y * 4 + j, i, j); };
-  const face = new Set([...labels].filter(([, p]) => p === 'face').map(([k]) => k));
-  // Eyes and mouth: dark pixels enclosed by the face (face on both sides in the row, and above).
-  const inner = [...px].filter(([k, c]) => {
-    if (c !== BLACK || face.has(k)) return false;
-    const [x, y] = XY(k);
-    const row = [...face].map(XY).filter(([, yy]) => yy === y).map(([xx]) => xx);
-    return row.some((xx) => xx < x) && row.some((xx) => xx > x) && [...face].some((f) => { const [fx, fy] = XY(f); return fx === x && fy < y; });
-  }).map(([k]) => XY(k));
-  const cut = fb.y0 + (fb.y1 - fb.y0) * 0.55;
-  const eyes = inner.filter(([, y]) => y < cut), mouth = inner.filter(([, y]) => y >= cut);
-  for (const [k, col] of out) if (col === DIAMOND.hair && !inner.some(([x, y]) => K(x, y) === k)) cell4(k, (X, Y) => put4(X, Y, (X + 64) % 3 === 1 ? '#33261f' : DIAMOND.hair));
-  // Sherpa fleece: soft darker curls.
-  for (const [k, col] of out) if (col === DIAMOND.fleece) cell4(k, (X, Y) => put4(X, Y, ((X + 64) * 5 + (Y + 64) * 3) % 7 === 0 ? '#d9ceb6' : DIAMOND.fleece));
-  // Gucci web stripe with interlocking gold GG.
-  if (torso && torso.length >= 12) {
-    const cx = Math.round(fb.cx);
-    const ys = torso.map(XY).filter(([x]) => x === cx).map(([, y]) => y).sort((a, b) => a - b);
-    const gy = ys[Math.floor(ys.length / 2)];
-    base.set(K(cx, gy), DIAMOND.red);
-    if (ys.length >= 2) {
-      const G = ['.gggg.', 'g....g', 'g.....', 'g..ggg', 'g....g', '.gggg.'];
-      const X0 = cx * 4 + 2 - 5, Y0 = Math.min(gy * 4 + 2 - 3, (ys[ys.length - 1] + 1) * 4 - 6);
-      const stripe = (X, Y) => Math.abs(Math.floor(X / 4) - cx) <= 1 && ys.includes(Math.floor(Y / 4));
-      G.forEach((r, j) => [...r].forEach((ch, i) => {
-        if (ch !== 'g') return;
-        if (stripe(X0 + i, Y0 + j)) put4(X0 + i, Y0 + j, DIAMOND.gold); // left G
-        if (stripe(X0 + 9 - i, Y0 + j)) put4(X0 + 9 - i, Y0 + j, DIAMOND.gold); // right G, mirrored
-      }));
-    } else out.set(K(cx, gy), DIAMOND.gold);
-  }
-  // Piercings, all nine: 3 descending on the forehead, cheekbones, dimples, bottom corners of the mouth.
-  const avg = (a) => a.reduce((s, v) => s + v, 0) / a.length;
-  const ex = eyes.map(([x]) => x), eyY = eyes.length ? avg(eyes.map(([, y]) => y)) : fb.y0 + (fb.y1 - fb.y0) * 0.35;
-  let eL = ex.length ? Math.min(...ex) : fb.x0 + 1, eR = ex.length ? Math.max(...ex) : fb.x1 - 1;
-  if (eR - eL < 2) { eL = Math.min(eL, fb.x0 + 1); eR = Math.max(eR, fb.x1 - 1); }
-  const mx = mouth.map(([x]) => x);
-  const m0 = mx.length ? Math.min(...mx) : fb.cx - 1, m1 = mx.length ? Math.max(...mx) : fb.cx + 1;
-  const my = mouth.length ? avg(mouth.map(([, y]) => y)) : fb.y1 - 1;
-  const mid = (eL + eR) / 2;
-  const studs = [
-    [mid, fb.y0 + 0.05], [mid, fb.y0 + 0.8], [mid, fb.y0 + 1.55], // forehead, descending
-    [eL - 0.6, eyY + 1.1], [eR + 0.6, eyY + 1.1], // cheekbones
-    [m0 - 1.1, my - 0.5], [m1 + 1.1, my - 0.5], // dimples
-    [m0 - 0.3, my + 0.7], [m1 + 0.3, my + 0.7], // bottom corners of the mouth
-  ];
-  let placed = 0;
-  for (let [x, y] of studs) {
-    // keep it on the face: nudge toward the face centre until the 1x pixel under it is face
-    for (let t = 0; t < 6 && !face.has(K(Math.floor(x), Math.floor(y))); t++) { x += Math.sign(fb.cx + 0.5 - x) * 0.5; y += Math.sign(fb.cy + 0.5 - y) * 0.5; }
-    const X = Math.round(x * 4), Y = Math.round(y * 4);
-    put4(X - 1, Y - 1, '#ffffff'); put4(X, Y - 1, DIAMOND.stud); put4(X - 1, Y, DIAMOND.stud); put4(X, Y, '#9aa6b4');
-    placed++;
-  }
-  return { out, base, hi, studs: placed };
-}
-
-// ---- sheet ----
-const CELL = { w: 44, h: 40, ax: 22, ay: 36 }; // anchor = sprite origin
-const COLS = 9;
-const names = Array.from({ length: 34 }, (_, i) => `power_calligraphy_people_cel${String(i).padStart(3, '0')}`);
-const rgba = (rgb, a = 255) => ((rgb << 8) | a) >>> 0;
-const sheet = new Image(COLS * CELL.w, Math.ceil(names.length / COLS) * CELL.h);
-const S = 8, prev = new Image(COLS * CELL.w * S, Math.ceil(names.length / COLS) * CELL.h * S * 2, rgba(0xf4efe6));
-const cells = {};
-const D = 4; // detail density
-const detail = new Image(COLS * CELL.w * D, Math.ceil(names.length / COLS) * CELL.h * D);
-const dPrev = new Image(COLS * CELL.w * D * 2, Math.ceil(names.length / COLS) * CELL.h * D * 2, rgba(0xf4efe6));
-const results = names.map((name, i) => {
-  const px = decode(gfx.cels[name]);
-  return { name, i, px, ...(i < 17 ? tezzus(i, px) : diamond(i, px)) };
+const circle = (c, r) => ({ box: [c[0] - r, c[1] - r, c[0] + r, c[1] + r], test: (p) => V.dist(p, c) <= r, grow: (g) => circle(c, r + g) });
+const capsule = (a, b, r0, r1 = r0) => ({
+  box: [Math.min(a[0], b[0]) - Math.max(r0, r1), Math.min(a[1], b[1]) - Math.max(r0, r1), Math.max(a[0], b[0]) + Math.max(r0, r1), Math.max(a[1], b[1]) + Math.max(r0, r1)],
+  test: (p) => { const { d, t } = segDist(p, a, b); return d <= r0 + (r1 - r0) * t; },
+  grow: (g) => capsule(a, b, r0 + g, r1 + g),
 });
-for (const { name, i, px, out, base, hi } of results) {
-  const cx = (i % COLS) * CELL.w, cy = Math.floor(i / COLS) * CELL.h;
-  const put = (X, Y, col) => {
-    const sx = (cx + CELL.ax) * D + X, sy = (cy + CELL.ay) * D + Y;
-    detail.px[sy * detail.w + sx] = rgba(hex(col));
-    dPrev.fill(sx * 2, sy * 2, 2, 2, rgba(hex(col)));
+const ellipse = (c, rx, ry, ang = 0) => {
+  const co = Math.cos(ang), si = Math.sin(ang), R = Math.max(rx, ry);
+  return {
+    box: [c[0] - R, c[1] - R, c[0] + R, c[1] + R],
+    test: (p) => { const dx = p[0] - c[0], dy = p[1] - c[1]; const u = dx * co + dy * si, w = -dx * si + dy * co; return (u / rx) ** 2 + (w / ry) ** 2 <= 1; },
+    grow: (g) => ellipse(c, rx + g, ry + g, ang),
   };
-  for (const [k, col] of base) { const [x, y] = XY(k); for (let j = 0; j < D; j++) for (let q = 0; q < D; q++) put(x * D + q, y * D + j, col); }
-  for (const [k, col] of hi) {
-    const [X, Y] = XY(k);
-    if (!base.has(K(Math.floor(X / D), Math.floor(Y / D)))) continue; // detail stays inside the 1x silhouette
-    put(X, Y, col);
+};
+function poly(pts, pad = 0) {
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const inside = (p) => {
+    let c = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const [xi, yi] = pts[i], [xj, yj] = pts[j];
+      if (yi > p[1] !== yj > p[1] && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  };
+  return {
+    box: [Math.min(...xs) - pad, Math.min(...ys) - pad, Math.max(...xs) + pad, Math.max(...ys) + pad],
+    test: (p) => inside(p) || (pad > 0 && pts.some((a, i) => segDist(p, a, pts[(i + 1) % pts.length]).d <= pad)),
+    grow: (g) => poly(pts, pad + g),
+  };
+}
+
+const INK = '#000000';
+class Canvas {
+  constructor() {
+    this.w = CELL.w * D;
+    this.h = CELL.h * D;
+    this.px = new Array(this.w * this.h).fill(null);
+  }
+  fill(shape, color, clip) {
+    const [x0, y0, x1, y1] = shape.box;
+    const X0 = Math.max(0, Math.floor((x0 + CELL.ax) * D)), X1 = Math.min(this.w - 1, Math.ceil((x1 + CELL.ax) * D));
+    const Y0 = Math.max(0, Math.floor((y0 + CELL.ay) * D)), Y1 = Math.min(this.h - 1, Math.ceil((y1 + CELL.ay) * D));
+    for (let Y = Y0; Y <= Y1; Y++)
+      for (let X = X0; X <= X1; X++) {
+        const p = [(X + 0.5) / D - CELL.ax, (Y + 0.5) / D - CELL.ay];
+        if (!shape.test(p) || (clip && !clip(p, this.px[Y * this.w + X]))) continue;
+        const c = typeof color === 'function' ? color(p, X, Y) : color;
+        if (c) this.px[Y * this.w + X] = c;
+      }
+  }
+  // Outlined shape: black grown copy first, then the fill (so overlapping parts get inner outlines too).
+  draw(shape, color, ol = OL) {
+    if (ol > 0) this.fill(shape.grow(ol), INK);
+    this.fill(shape, color);
+  }
+  dot(p, color) { // one detail pixel at game coords p
+    const X = Math.floor((p[0] + CELL.ax) * D), Y = Math.floor((p[1] + CELL.ay) * D);
+    if (X >= 0 && Y >= 0 && X < this.w && Y < this.h) this.px[Y * this.w + X] = color;
   }
 }
-for (const { name, i, px, out } of results) {
-  const cx = (i % COLS) * CELL.w, cy = Math.floor(i / COLS) * CELL.h;
-  cells[name] = { x: cx, y: cy, w: CELL.w, h: CELL.h, ax: CELL.ax, ay: CELL.ay, who: i < 17 ? 'tezzus' : 'diamond' };
-  const rowY = Math.floor(i / COLS) * CELL.h * S * 2;
-  prev.rect(cx * S, rowY, CELL.w * S, CELL.h * S * 2, rgba(0xc8c2b8));
-  for (const [k, c] of px) {
-    const [x, y] = XY(k);
-    prev.fill((cx + CELL.ax + x) * S, rowY + (CELL.ay + y) * S, S, S, rgba(pal10[c]));
+
+// ---------- pose -> skeleton ----------
+function skeleton(pose, build) {
+  const S = (p) => V.mul(p, SCALE);
+  const head = S(pose.head), neck = S(pose.neck), hip = S(pose.hip);
+  const u = V.norm(V.sub(hip, neck)); // down the spine
+  const v = [u[1], -u[0]]; // across the body (screen-right when upright)
+  const sd = V.add(neck, V.mul(u, build.shoulderDrop));
+  const sh = [V.add(sd, V.mul(v, -build.shoulder)), V.add(sd, V.mul(v, build.shoulder))];
+  const hp = [V.add(hip, V.mul(v, -build.hipW)), V.add(hip, V.mul(v, build.hipW))];
+  let arms = pose.arms.map(([e, h]) => [S(e), S(h)]);
+  let legs = pose.legs.map(([k, f]) => [S(k), S(f)]);
+  // each limb goes to the nearer shoulder / hip socket
+  if (V.dist(arms[0][0], sh[0]) + V.dist(arms[1][0], sh[1]) > V.dist(arms[0][0], sh[1]) + V.dist(arms[1][0], sh[0])) arms = [arms[1], arms[0]];
+  if (V.dist(legs[0][0], hp[0]) + V.dist(legs[1][0], hp[1]) > V.dist(legs[0][0], hp[1]) + V.dist(legs[1][0], hp[0])) legs = [legs[1], legs[0]];
+  return { head, neck, hip, u, v, sh, hp, arms, legs, facing: pose.facing, down: !!pose.down, upright: u[1] > 0.6 };
+}
+
+// shoe pointing outward (or where the head faces), sitting on the foot point
+function shoe(cv, foot, knee, sk, o) {
+  const out = sk.facing || Math.sign(foot[0] - sk.hip[0]) || 1;
+  const lifted = !sk.upright || foot[1] < -4;
+  const dir = lifted ? V.norm(V.sub(foot, knee)) : [out, 0];
+  const c = V.add(foot, V.mul(dir, o.toe));
+  const ang = Math.atan2(dir[1], dir[0]);
+  cv.draw(ellipse(c, o.rx, o.ry, ang), (p) => {
+    const rel = V.sub(p, c), along = rel[0] * Math.cos(ang) + rel[1] * Math.sin(ang), across = -rel[0] * Math.sin(ang) + rel[1] * Math.cos(ang);
+    if (across * Math.sign(Math.cos(ang) || 1) > o.ry * 0.35) return o.sole;
+    if (o.stripe && Math.abs(across * Math.sign(Math.cos(ang) || 1) + 0.15 - along * out * 0.25) < 0.26 && Math.abs(along) < o.rx * 0.6) return o.sole;
+    return o.color;
+  });
+}
+const strands = (base, lit) => (p, X, Y) => ((X + 1000 + Math.floor((Y + 1000) / 6)) % 4 === 0 ? lit : base);
+
+// ---------- Tezzus ----------
+const TZ = {
+  skin: '#7a4a33', hair: '#15100e', hairLit: '#3b2d27', ink: '#1d120c',
+  red: '#cf2229', redDark: '#7a0c12', redLit: '#f4675d', tank: '#f4f1ea',
+  denim: '#a9c2dc', rip: '#f5f7fa', shoe: '#cc1f27', sole: '#f4f1ea',
+  lens: '#2b0d12', lensLit: '#a0707a', silver: '#d7dde6', gold: '#e2b33b',
+};
+const TZ_BUILD = { shoulder: 3.4, shoulderDrop: 1.0, hipW: 1.7 };
+// red leather scales: rows of overlapping rounded scales, dark lower rims, a glint on each
+const scales = (p, X, Y) => {
+  const row = Math.floor((Y + 1000) / 5), off = (row & 1) * 3;
+  const cx = (X + 1000 + off) % 6, cy = (Y + 1000) % 5;
+  if (cy === 4 || (cy === 3 && (cx === 0 || cx === 5))) return TZ.redDark;
+  if (cy === 0 && (cx === 2 || cx === 3)) return TZ.redLit;
+  return TZ.red;
+};
+
+function tezzus(pose) {
+  const sk = skeleton(pose, TZ_BUILD), cv = new Canvas();
+  const { head, neck, hip, u, v, sh, hp } = sk;
+  const HR = 4.3;
+  // dreads hanging behind the head
+  if (!sk.down)
+    for (const s of [-1, 1])
+      for (let i = 0; i < 3; i++) {
+        const a = V.add(head, [s * (2.6 + i * 0.7), -1.8 + i * 0.4]);
+        cv.draw(capsule(a, V.add(a, [s * 0.9, 4.2 - i * 0.6]), 0.95, 0.75), strands(TZ.hair, TZ.hairLit), 0.7);
+      }
+  // legs: skinny ripped jeans, red high-tops
+  sk.legs.forEach(([knee, foot], i) => {
+    const socket = hp[i], mid = V.lerp(socket, knee, 0.55);
+    const rips = (p) => {
+      if (V.dist(p, knee) < 1.1 && Math.abs(p[1] - knee[1] + 0.2) < 0.35) return TZ.rip;
+      if (V.dist(p, mid) < 0.9 && Math.abs(p[1] - mid[1]) < 0.28) return TZ.rip;
+      return TZ.denim;
+    };
+    cv.draw(capsule(socket, knee, 1.75, 1.55), rips);
+    cv.draw(capsule(knee, foot, 1.55, 1.35), rips);
+    shoe(cv, foot, knee, sk, { color: TZ.shoe, sole: TZ.sole, rx: 2.5, ry: 1.6, toe: 0.9 });
+  });
+  // belt with a gold buckle
+  cv.draw(capsule(V.add(hp[0], V.mul(v, -0.4)), V.add(hp[1], V.mul(v, 0.4)), 1.0), '#1b1616');
+  cv.draw(circle(hip, 0.75), TZ.gold, 0.45);
+  // cropped scale jacket, open over a white tank
+  const waist = V.add(hip, V.mul(u, -1.0));
+  cv.draw(poly([V.add(sh[0], V.mul(v, -0.9)), V.add(sh[1], V.mul(v, 0.9)), V.add(waist, V.mul(v, 3.0)), V.add(waist, V.mul(v, -3.0))]), scales);
+  const tank = poly([V.add(neck, V.mul(v, -1.3)), V.add(neck, V.mul(v, 1.3)), V.add(waist, V.mul(v, 1.1)), V.add(waist, V.mul(v, -1.1))]);
+  cv.fill(tank.grow(0.35), INK); // lapel edges
+  cv.fill(tank, TZ.tank);
+  cv.fill(circle(V.add(neck, V.mul(u, 0.6)), 1.0), TZ.skin); // neckline
+  for (let t = 0; t <= 1; t += 0.04) cv.dot(V.add(V.add(neck, V.mul(v, (t - 0.5) * 2.2)), V.mul(u, 1.4 + Math.sin(t * Math.PI) * 1.2)), TZ.silver); // chain
+  // arms: scale sleeves, tattooed hands
+  sk.arms.forEach(([elbow, hand], i) => {
+    cv.draw(capsule(sh[i], elbow, 1.9, 1.7), scales);
+    cv.draw(capsule(elbow, hand, 1.7, 1.5), scales);
+    const hd = V.norm(V.sub(hand, elbow)), hc = V.add(hand, V.mul(hd, 0.6));
+    cv.draw(circle(hc, 1.55), (p) => {
+      const q = V.sub(p, hc);
+      const ink = (Math.abs(q[1] + 0.35) < 0.14 && Math.abs(q[0]) < 0.9) || (Math.abs(q[1] - 0.45) < 0.14 && Math.abs(q[0] - 0.2) < 0.7) || V.len(V.sub(q, [-0.6, 0.1])) < 0.2;
+      return ink ? TZ.ink : TZ.skin;
+    });
+  });
+  // shoulder flaps: jagged leather scales sticking out
+  for (const i of [0, 1]) {
+    const s = i ? 1 : -1;
+    for (let k = 0; k < 3; k++) {
+      const a = V.add(sh[i], V.add(V.mul(v, s * (-0.6 + k * 0.9)), V.mul(u, -0.3 + k * 0.7)));
+      const tip = V.add(a, V.add(V.mul(v, s * 2.0), V.mul(u, -1.2 + k * 0.9)));
+      cv.draw(poly([V.add(a, V.mul(u, -0.9)), tip, V.add(a, V.mul(u, 0.9))]), TZ.red, 0.7);
+    }
   }
-  for (const [k, col] of out) {
-    const [x, y] = XY(k);
-    const sx = cx + CELL.ax + x, sy = cy + CELL.ay + y;
-    if (sx < cx || sy < cy || sx >= cx + CELL.w || sy >= cy + CELL.h) throw new Error(`${name}: pixel (${x},${y}) outside the cell`);
-    sheet.px[sy * sheet.w + sx] = rgba(hex(col));
-    prev.fill(sx * S, rowY + CELL.h * S + (CELL.ay + y) * S, S, S, rgba(hex(col)));
+  // head
+  cv.draw(capsule(neck, V.lerp(neck, head, 0.4), 1.1), TZ.skin);
+  cv.draw(circle(head, HR), TZ.skin);
+  if (!sk.down) {
+    const f = sk.facing, fc = V.add(head, [f * 1.1, 0.3]), sp = f ? 0.72 : 1;
+    const sy = fc[1] - 0.6; // shield shades
+    const shades = poly([[fc[0] - 3.6 * sp, sy - 1.0], [fc[0] + 3.6 * sp, sy - 1.0], [fc[0] + 3.2 * sp, sy + 1.1], [fc[0] + 0.3, sy + 0.8], [fc[0] - 0.3, sy + 0.8], [fc[0] - 3.2 * sp, sy + 1.1]]);
+    cv.draw(shades, (p) => (Math.abs(p[1] - sy + (p[0] - fc[0]) * 0.35) < 0.18 && p[1] < sy + 0.5 ? TZ.lensLit : TZ.lens), 0.5);
+    cv.fill(capsule([fc[0] - 0.6 * sp, sy + 2.9], [fc[0] + 0.7 * sp, sy + 2.8], 0.3), TZ.ink); // mouth
   }
-  prev.text(cx * S + 4, rowY + 4, String(i), rgba(0x6b6560), 3);
+  // dread mop on top
+  const top = sk.down ? V.add(head, [0, -0.6]) : head;
+  for (let k = 0; k < 9; k++) {
+    const ang = Math.PI * (1.05 + (k / 8) * 0.9);
+    cv.draw(circle(V.add(top, [Math.cos(ang) * (HR - 0.1), Math.sin(ang) * (HR - 0.1) - 1.3]), 1.5 + (k % 2) * 0.3), strands(TZ.hair, TZ.hairLit), 0.7);
+  }
+  cv.draw(ellipse(V.add(top, [0, -3.3]), HR - 0.3, 2.0), strands(TZ.hair, TZ.hairLit), 0);
+  if (sk.down) cv.draw(circle(head, HR - 0.3), strands(TZ.hair, TZ.hairLit), 0.6);
+  return cv;
+}
+
+// ---------- Diamond* ----------
+const DM = {
+  skin: '#5a3526', hair: '#120e0c', hairLit: '#3a2c25', fleece: '#efe6d1', fleeceShade: '#d8ccb3',
+  red: '#c61f29', green: '#1d6a41', gold: '#e4b53b', tee: '#fbfaf6', denim: '#3a5a86', denimDark: '#2a4266',
+  vans: '#1c1c1c', sole: '#f4f4f2', stud: '#dfe6ef', studLit: '#ffffff', studShade: '#8e99a8', eye: '#0b0908',
+};
+const DM_BUILD = { shoulder: 3.8, shoulderDrop: 1.1, hipW: 2.0 };
+const sherpa = (p, X, Y) => (((X + 1000) * 5 + (Y + 1000) * 3) % 9 === 0 || ((X + 1000) * 3 + (Y + 1000) * 7) % 11 === 0 ? DM.fleeceShade : DM.fleece);
+
+function diamond(pose) {
+  const sk = skeleton(pose, DM_BUILD), cv = new Canvas();
+  const { head, neck, hip, u, v, sh, hp } = sk;
+  const HR = 4.6;
+  // legs: baggy dark jeans, black/white Vans
+  sk.legs.forEach(([knee, foot], i) => {
+    cv.draw(capsule(hp[i], knee, 2.15, 2.0), (p) => (Math.abs(segDist(p, hp[i], knee).d - 1.2) < 0.15 ? DM.denimDark : DM.denim));
+    cv.draw(capsule(knee, foot, 2.0, 2.1), DM.denim);
+    shoe(cv, foot, knee, sk, { color: DM.vans, sole: DM.sole, rx: 2.7, ry: 1.6, toe: 1.0, stripe: true });
+  });
+  // oversized sherpa fleece: boxy body to the hips, red zip piping, Gucci web patch with gold GG
+  const hem = V.add(hip, V.mul(u, 0.9));
+  cv.draw(poly([V.add(sh[0], V.mul(v, -1.2)), V.add(sh[1], V.mul(v, 1.2)), V.add(hem, V.mul(v, 4.2)), V.add(hem, V.mul(v, -4.2))]), sherpa);
+  cv.fill(poly([V.add(neck, V.mul(v, -1.4)), V.add(neck, V.mul(v, 1.4)), V.add(neck, V.mul(u, 3.0))]), DM.tee); // tee in the collar
+  cv.fill(capsule(V.add(neck, V.mul(u, 3.0)), V.add(hem, V.mul(u, -0.2)), 0.28), DM.red); // zip piping
+  if (sk.upright) {
+    const pc = V.add(V.add(neck, V.mul(u, 4.2)), V.mul(v, -2.2));
+    const W = 1.35, H = 2.1;
+    cv.fill(poly([V.add(pc, [-W, -H]), V.add(pc, [W, -H]), V.add(pc, [W, H]), V.add(pc, [-W, H])]), (p) => (Math.abs(p[0] - pc[0]) < W / 3 ? DM.red : DM.green));
+    const G = ['.ggg..', 'g...g.', 'g.....', 'g..gg.', 'g...g.', '.ggg..'];
+    const X0 = Math.round((pc[0] + CELL.ax) * D) - 5, Y0 = Math.round((pc[1] + CELL.ay) * D) - 3;
+    G.forEach((r, j) => [...r].forEach((ch, i) => {
+      if (ch !== 'g') return;
+      cv.px[(Y0 + j) * cv.w + X0 + i] = DM.gold; // G
+      cv.px[(Y0 + j) * cv.w + X0 + 9 - i] = DM.gold; // mirrored G, interlocking
+    }));
+  }
+  // puffy sherpa sleeves with red cuffs
+  sk.arms.forEach(([elbow, hand], i) => {
+    cv.draw(capsule(sh[i], elbow, 2.35, 2.2), sherpa);
+    const hd = V.norm(V.sub(hand, elbow)), wrist = V.add(hand, V.mul(hd, -1.2));
+    cv.draw(capsule(elbow, wrist, 2.2, 2.1), sherpa);
+    cv.draw(capsule(V.add(wrist, V.mul(hd, -0.5)), V.add(wrist, V.mul(hd, 0.25)), 1.9), DM.red, 0.6);
+    cv.draw(circle(V.add(hand, V.mul(hd, 0.3)), 1.55), DM.skin);
+  });
+  // soft collar with a red edge
+  cv.draw(ellipse(V.add(neck, V.mul(u, 0.4)), 3.2, 1.5, Math.atan2(v[1], v[0])), (p) => (V.dist(p, neck) > 2.6 ? DM.red : DM.fleece), 0.7);
+  // head
+  cv.draw(circle(head, HR), DM.skin);
+  // hair: dark cap + tied-up dreads fanning from the crown, red tie
+  const crown = V.add(head, sk.down ? [0, 0] : [0, -HR + 0.1]);
+  const cap = sk.down
+    ? circle(head, HR - 0.2)
+    : poly([...Array(13)].map((_, k) => { const a = Math.PI * (1 + k / 12); return V.add(head, [Math.cos(a) * HR, Math.sin(a) * HR + (k === 0 || k === 12 ? 0.6 : 0)]); }).concat([V.add(head, [HR * 0.7, -1.2]), V.add(head, [-HR * 0.7, -1.2])]));
+  cv.fill(cap, strands(DM.hair, DM.hairLit));
+  if (!sk.down)
+    for (let k = 0; k < 7; k++) {
+      const ang = -Math.PI / 2 + (k - 3) * 0.42, L = 5.0 - Math.abs(k - 3) * 0.3;
+      const tip = V.add(crown, [Math.cos(ang) * L, Math.sin(ang) * L + Math.abs(k - 3) * 0.35]);
+      cv.draw(capsule(V.add(crown, [0, -0.8]), tip, 0.85, 0.55), strands(DM.hair, DM.hairLit), 0.6);
+    }
+  if (!sk.down) cv.draw(ellipse(V.add(crown, [0, -1.0]), 1.2, 0.65), DM.red, 0.55);
+  if (!sk.down) {
+    const f = sk.facing, fc = V.add(head, [f * 1.2, 0.6]), sp = f ? 0.72 : 1;
+    for (const s of [-1, 1]) {
+      const e = V.add(fc, [s * 1.6 * sp, -0.5]);
+      cv.fill(ellipse(e, 0.55, 0.8), DM.eye);
+      cv.dot(V.add(e, [-0.2, -0.4]), '#ffffff');
+    }
+    // small smile
+    cv.fill(capsule([fc[0] - 0.95 * sp, fc[1] + 1.85], [fc[0], fc[1] + 2.25], 0.22), DM.eye);
+    cv.fill(capsule([fc[0], fc[1] + 2.25], [fc[0] + 0.95 * sp, fc[1] + 1.85], 0.22), DM.eye);
+    // nine piercings: 3 descending on the forehead, cheekbones, dimples, bottom corners of the mouth
+    const studs = [[0, -3.3], [0, -2.6], [0, -1.9], [-2.9, 0.2], [2.9, 0.2], [-2.6, 1.5], [2.6, 1.5], [-1.4, 2.75], [1.4, 2.75]];
+    for (const [dx, dy] of studs) {
+      const c = V.add(fc, [dx * sp, dy]);
+      const X = Math.round((c[0] + CELL.ax) * D), Y = Math.round((c[1] + CELL.ay) * D);
+      cv.px[(Y - 1) * cv.w + X - 1] = DM.studLit;
+      cv.px[(Y - 1) * cv.w + X] = DM.stud;
+      cv.px[Y * cv.w + X - 1] = DM.stud;
+      cv.px[Y * cv.w + X] = DM.studShade;
+    }
+  }
+  return cv;
+}
+
+// ---------- sheet ----------
+const COLS = 9, N = POSES.length;
+const rgba = (s, a = 255) => ((parseInt(s.slice(1), 16) << 8) | a) >>> 0;
+const sheet1 = new Image(COLS * CELL.w, Math.ceil(N / COLS) * CELL.h);
+const sheet4 = new Image(COLS * CELL.w * D, Math.ceil(N / COLS) * CELL.h * D);
+const PS = 2; // preview: detail sheet at 2x (8 px per game pixel)
+const prev = new Image(COLS * CELL.w * D * PS, Math.ceil(N / COLS) * CELL.h * D * PS, rgba('#f4efe6'));
+const cells = {};
+for (let n = 0; n < N; n++) {
+  const cv = n < 17 ? tezzus(POSES[n]) : diamond(POSES[n]);
+  const name = `power_calligraphy_people_cel${String(n).padStart(3, '0')}`;
+  const cx = (n % COLS) * CELL.w, cy = Math.floor(n / COLS) * CELL.h;
+  cells[name] = { x: cx, y: cy, w: CELL.w, h: CELL.h, ax: CELL.ax, ay: CELL.ay, who: n < 17 ? 'tezzus' : 'diamond' };
+  prev.rect(cx * D * PS, cy * D * PS, CELL.w * D * PS, CELL.h * D * PS, rgba('#c8c2b8'));
+  for (let Y = 0; Y < cv.h; Y++)
+    for (let X = 0; X < cv.w; X++) {
+      const c = cv.px[Y * cv.w + X];
+      if (!c) continue;
+      sheet4.px[(cy * D + Y) * sheet4.w + cx * D + X] = rgba(c);
+      prev.fill((cx * D + X) * PS, (cy * D + Y) * PS, PS, PS, rgba(c));
+    }
+  // 1x mask: a game pixel is covered if any of its detail pixels is; colour = the most common one
+  for (let y = 0; y < CELL.h; y++)
+    for (let x = 0; x < CELL.w; x++) {
+      const count = new Map();
+      for (let j = 0; j < D; j++) for (let i = 0; i < D; i++) { const c = cv.px[(y * D + j) * cv.w + x * D + i]; if (c) count.set(c, (count.get(c) ?? 0) + 1); }
+      if (count.size) sheet1.px[(cy + y) * sheet1.w + cx + x] = rgba([...count].sort((a, b) => b[1] - a[1])[0][0]);
+    }
+  prev.text(cx * D * PS + 6, cy * D * PS + 6, String(n), rgba('#6b6560'), 4);
 }
 const out = join(ROOT, 'public', 'skins', 'diamond-star', 'calligraphy');
 mkdirSync(out, { recursive: true });
-writeFileSync(join(out, 'dancers.png'), sheet.png());
-writeFileSync(join(out, 'dancers@4x.png'), detail.png());
+writeFileSync(join(out, 'dancers.png'), sheet1.png());
+writeFileSync(join(out, 'dancers@4x.png'), sheet4.png());
 writeFileSync(
   join(out, 'dancers.json'),
-  JSON.stringify({ note: 'Power Calligraphy dancers for Young Stoner Life (man -> Tezzus, woman -> Diamond*). Generated by tools/diamond-dancers.mjs.', sheet: 'dancers.png', detail: { sheet: 'dancers@4x.png', scale: D }, cells }, null, 1) + '\n',
+  JSON.stringify({
+    note: 'Young Stoner Life dancers (man cels -> Tezzus, woman cels -> Diamond*), new art on the original poses. Generated by tools/diamond-dancers.mjs.',
+    sheet: 'dancers.png', detail: { sheet: 'dancers@4x.png', scale: D }, cells,
+  }, null, 1) + '\n',
 );
 const specs = join(ROOT, 'reference', 'specs', 'power_calligraphy');
 mkdirSync(specs, { recursive: true });
-writeFileSync(join(specs, 'diamond-dancers_preview_8x.png'), prev.png());
-writeFileSync(join(specs, 'diamond-dancers_detail_8x.png'), dPrev.png());
-const st = results.filter((r) => r.studs !== undefined).map((r) => r.studs);
-console.log('Diamond* studs per frame:', Math.min(...st), '-', Math.max(...st));
-console.log('wrote', Object.keys(cells).length, 'frames');
+writeFileSync(join(specs, 'diamond-dancers_preview.png'), prev.png());
+console.log('wrote', N, 'frames');

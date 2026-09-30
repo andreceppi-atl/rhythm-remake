@@ -34,6 +34,12 @@ export function drawRasterCel(
     const source = (y * cel.w + x) * 4;
     const alpha = cel.rgba[source + 3];
     if (!alpha) return;
+    if (cel.detail && owner) {
+      // Drawn by the hi-res pass: only claim the pixel here, so what is behind shows through the detail's gaps.
+      priorities[i] = cel.priority;
+      owner[i] = id;
+      return;
+    }
     const a = alpha / 255;
     const old = out[i];
     const r = Math.round(cel.rgba[source] * a + (old & 255) * (1 - a));
