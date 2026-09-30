@@ -221,8 +221,10 @@ function showImport() {
   $('imp-bpm').textContent = chart.bpm.toFixed(1);
   $('imp-offset').textContent = `${(chart.firstBeat * 1000).toFixed(0)}ms`;
   const mins = Math.floor(grid.duration / 60), secs = Math.round(grid.duration % 60).toString().padStart(2, '0');
+  const game = document.querySelector<HTMLInputElement>('input[name=game]:checked')?.value ?? 'karate';
+  const what = game === 'karate' ? `${chart.cues.length} punches` : `${game === 'ysl' ? 'Young Stoner Life' : 'Calligraphy'} characters on the beat`;
   $('imp-summary').textContent =
-    `${chart.cues.length} punches · ${mins}:${secs}` +
+    `${what} · ${mins}:${secs}` +
     (imported.fromFile ? ' · loaded chart file' : '') +
     (grid.confidence < 0.25 ? ' · beat detection unsure: check the BPM (autoplay helps)' : '');
   impStatus.textContent = imported.fromFile ? '' : `beat confidence ${(grid.confidence * 100).toFixed(0)}%`;
@@ -374,6 +376,7 @@ for (const b of importPanel.querySelectorAll<HTMLButtonElement>('[data-nudge]'))
   };
 }
 for (const r of importPanel.querySelectorAll<HTMLInputElement>('input[name=diff]')) r.onchange = regenerate;
+for (const r of importPanel.querySelectorAll<HTMLInputElement>('input[name=game]')) r.onchange = showImport;
 $('imp-back').onclick = () => {
   importPanel.hidden = true;
   toMenu();
