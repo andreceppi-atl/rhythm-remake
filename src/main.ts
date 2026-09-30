@@ -8,6 +8,7 @@ import { KARATE_TEXT_EN } from './games/karate-man/text-en';
 import { adjustGrid, analyzeAudio, type Analysis } from './autochart/analyze';
 import { generateChart, type Chart, type Difficulty } from './autochart/chart';
 import { chartToLevel, CUSTOM_SCRIPT, CUSTOM_TEXT } from './autochart/level';
+import { calligraphyLevel, PC_SONG_SCENES, type CalligraphySet } from './autochart/calligraphy';
 import { PowerCalligraphy } from './games/power-calligraphy';
 import { loadPcTuning } from './games/power-calligraphy/tuning';
 import { PC_TEXT_EN } from './games/power-calligraphy/text-en';
@@ -139,9 +140,10 @@ async function ensureGame(game: string) {
 
 async function play(scene: string) {
   await ensureGame(scene === CUSTOM_SCRIPT ? 'karate_man' : gameOfScene(scene));
-  if (prologue && scene === YSL_SCENE) prologue.title = 'Young Stoner Life';
+  if (prologue && (scene === YSL_SCENE || scene === PC_SONG_SCENES.ysl)) prologue.title = 'Young Stoner Life';
   else if (prologue && gameOfScene(scene) === 'power_calligraphy') prologue.title = GAME_TITLES.power_calligraphy;
-  rt.look = scene === YSL_SCENE ? 'diamond-star' : null; // Young Stoner Life uses Diamond*'s hand + dancers
+  // Young Stoner Life (and songs played on it) uses Diamond*'s hand + dancers
+  rt.look = scene === YSL_SCENE || scene === PC_SONG_SCENES.ysl ? 'diamond-star' : null;
   lastScene = scene;
   menu.hidden = true;
   results.hidden = true;
@@ -388,6 +390,18 @@ $('imp-play').onclick = () => void playImported();
 
 async function playImported() {
   if (!imported) return;
+  const game = (document.querySelector<HTMLInputElement>('input[name=game]:checked')?.value ?? 'karate') as 'karate' | CalligraphySet;
+  if (game !== 'karate') {
+    // Power Calligraphy / Young Stoner Life: the level's own characters laid on the song's bars.
+    await ensureGame('power_calligraphy');
+    const level = calligraphyLevel(rt.data.level, imported.grid, game, difficulty());
+    Object.assign(rt.data.level.scripts, level.scripts);
+    Object.assign(rt.data.level.scenes, level.scenes);
+    rt.customAudio = imported.buffer;
+    importPanel.hidden = true;
+    await play(PC_SONG_SCENES[game]);
+    return;
+  }
   await ensureGame('karate_man');
   const level = chartToLevel(imported.chart);
   Object.assign(rt.data.level.scripts, level.scripts);
