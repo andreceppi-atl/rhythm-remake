@@ -8,3 +8,6 @@ reference/specs/
 reference/handoff/
 .vercel
 .env*
+
+# Lab reference sheet rendered from the game data (Nintendo art): local only
+public/lab/dancers/original.png

@@ -350,13 +350,25 @@ export class Pix {
   colours() { return new Set(this.col.filter(Boolean)); }
 }
 const R = (v) => Math.round(v);
+// Stamp a face template centred on (cx, ey) = (head centre column, eye row), only over the head's own pixels.
+// Turned heads shift the template toward the facing side; columns past the head edge are dropped.
+function stampFace(px, cx, ey, rows, key, skin) {
+  const w = rows[0].length, ox = cx - (w >> 1);
+  rows.forEach((r, j) => [...r].forEach((ch, i) => {
+    const c = key[ch];
+    if (!c) return;
+    const x = ox + i, y = ey + j - rows.findIndex((row) => row.includes('|'));
+    const cur = px.get(x, y);
+    if (cur && cur !== INK && (cur === skin || ch === 'K' || ch === 'L' || ch === 'l' || ch === 'k')) px.set(x, y, c);
+  }));
+}
 
 const TZ8 = {
-  skin: '#7a4a33', hair: '#1a1412', hairLit: '#45352d', red: '#d62a2f', redDark: '#86121a', redLit: '#f7736a',
+  skin: '#8a5638', hair: '#1a1412', hairLit: '#45352d', red: '#d62a2f', redDark: '#86121a', redLit: '#f7736a',
   tank: '#f4f1ea', denim: '#a9c2dc', denimDark: '#6f8db0', lens: '#2b0d12', lensLit: '#b08890', gold: '#e8b93c', ink2: '#2a1810',
 };
 export function gbaTezzus(pose, opts = {}) {
-  const head = opts.head ?? 4.5;
+  const head = opts.head ?? 5.4;
   const sk = skeleton(pose, { shoulder: 3.0, shoulderDrop: 1.0, hipW: 1.5 });
   const px = new Pix();
   const { neck, hip, u, v, sh, hp } = sk;
@@ -402,31 +414,29 @@ export function gbaTezzus(pose, opts = {}) {
     test: (p) => {
       const d = V.sub(p, top), a = Math.atan2(d[1], d[0]);
       const r = head + 0.4 + 0.7 * Math.abs(Math.sin(a * 4.5)); // bumpy locs
-      return V.len(d) <= r && (sk.down || p[1] < top[1] - (head > 5 ? 0.6 : 0.3) || Math.abs(d[0]) > head - 1.3);
+      return V.len(d) <= r && (sk.down || p[1] < top[1] - 1.2 || (Math.abs(d[0]) > head - 0.5 && p[1] < top[1] + 1.5));
     },
   }, (p, x, y) => ((x + 2 * y) % 5 === 0 ? TZ8.hairLit : TZ8.hair), 'hair');
   px.outline();
   if (!sk.down) {
-    // face: shield shades (frame + lens + glint), mouth
-    const f = sk.facing, cx = R(hc[0] + f * 1), ey = R(hc[1]);
-    const half = f ? 2 : 3;
-    for (let x = cx - half - (f < 0 ? 1 : 0); x <= cx + half + (f > 0 ? 1 : 0); x++) {
-      if (!px.get(x, ey) || px.get(x, ey) === INK && Math.abs(x - cx) > half) continue;
-      px.set(x, ey, TZ8.lens);
-      px.set(x, ey - 1, INK);
-    }
-    px.set(cx - 1 + f, ey, TZ8.lensLit);
-    px.set(cx + f, ey + 2, INK); px.set(cx + 1 + f, ey + 2, INK);
+    // face: shield shades (2 rows) with a glint, small mouth
+    const f = sk.facing;
+    stampFace(px, R(hc[0]) + f, R(hc[1]), [
+      'kKKKKKKKk',
+      'kLlLL|LLk',
+      '.........',
+      '...MMM...',
+    ], { k: INK, K: INK, L: TZ8.lens, l: TZ8.lensLit, M: INK, '|': TZ8.lens }, TZ8.skin);
   }
   return px;
 }
 
 const DM8 = {
-  skin: '#5a3526', hair: '#140f0d', hairLit: '#46362d', fleece: '#f1e9d6', fleeceShade: '#cfc2a6', red: '#c61f29',
+  skin: '#6e4130', hair: '#140f0d', hairLit: '#46362d', fleece: '#f1e9d6', fleeceShade: '#cfc2a6', red: '#c61f29',
   green: '#1d6a41', gold: '#e8bb3e', white: '#fbfaf6', denim: '#3a5a86', denimDark: '#253d5f', vans: '#1d1d1d', stud: '#e6edf5',
 };
 export function gbaDiamond(pose, opts = {}) {
-  const head = opts.head ?? 4.7;
+  const head = opts.head ?? 5.4;
   const sk = skeleton(pose, { shoulder: 3.4, shoulderDrop: 1.1, hipW: 1.8 });
   const px = new Pix();
   const { neck, hip, u, v, sh, hp } = sk;
@@ -460,7 +470,7 @@ export function gbaDiamond(pose, opts = {}) {
   const hairTex = (p, x, y) => ((x + 64) % 3 === 0 ? DM8.hairLit : DM8.hair);
   if (sk.down) px.paint(circle(hc, head - 0.5), hairTex, 'hair');
   else {
-    px.paint({ box: [hc[0] - head, hc[1] - head, hc[0] + head, hc[1]], test: (p) => V.dist(p, hc) <= head - 0.5 && p[1] < hc[1] - head * 0.45 }, hairTex, 'hair');
+    px.paint({ box: [hc[0] - head, hc[1] - head, hc[0] + head, hc[1]], test: (p) => V.dist(p, hc) <= head - 0.5 && p[1] < hc[1] - 3.4 }, hairTex, 'hair');
     for (let k = -2; k <= 2; k++) {
       const a = -Math.PI / 2 + k * 0.45, L = 3.6 - Math.abs(k) * 0.3;
       px.paint(capsule(V.add(crown, [0, -0.5]), V.add(crown, [Math.cos(a) * L, Math.sin(a) * L + Math.abs(k) * 0.4]), 0.75, 0.6), hairTex, 'locs');
@@ -468,19 +478,19 @@ export function gbaDiamond(pose, opts = {}) {
   }
   px.outline();
   if (!sk.down) {
-    const f = sk.facing, cx = R(hc[0] + f * 1), ey = R(hc[1]) - 1, my = ey + 3;
-    const sp = f ? 1 : 2; // eye spacing from centre
+    const f = sk.facing;
     // red hair tie on the bundle
     px.set(R(crown[0]) - 1, R(crown[1]) - 1, DM8.red); px.set(R(crown[0]), R(crown[1]) - 1, DM8.red);
-    // eyes (2 tall), mouth
-    for (const s of [-1, 1]) { px.set(cx + s * sp - (s > 0 ? 1 : 0), ey, INK); px.set(cx + s * sp - (s > 0 ? 1 : 0), ey + 1, INK); }
-    px.set(cx - 1, my, INK); px.set(cx, my, INK);
-    // piercings (what a GBA face holds): 3 down the forehead, cheekbones, dimples, bottom corners of the mouth
-    const stud = (x, y) => { if (px.get(x, y) === DM8.skin) px.set(x, y, DM8.stud); };
-    stud(cx - (f < 0 ? 1 : 0), ey - 2); stud(cx - (f < 0 ? 1 : 0), ey - 3); stud(cx - (f < 0 ? 1 : 0), ey - 4);
-    stud(cx - sp - 2, ey + 2); stud(cx + sp + 1, ey + 2);
-    stud(cx - 3, my - 1); stud(cx + 2, my - 1);
-    stud(cx - 2, my + 1); stud(cx + 1, my + 1);
+    // eyes (white + pupil), and all nine piercings: 3 down the forehead, cheekbones, dimples, mouth corners
+    stampFace(px, R(hc[0]) + f, R(hc[1]), [
+      '....o....',
+      '....O....',
+      '....o....',
+      '.WK..|KW.',
+      'o.......o',
+      '.o.....o.',
+      '..oMMMo..',
+    ], { o: DM8.stud, O: '#ffffff', W: '#ffffff', K: INK, M: INK }, DM8.skin);
   }
   // web stripe + gold G on the chest when upright
   if (sk.upright) {
