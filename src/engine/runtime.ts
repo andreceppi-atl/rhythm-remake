@@ -270,14 +270,14 @@ export class Runtime {
         if (gy < 0 || gy >= H) continue;
         for (let x = 0; x < D.w; x++) {
           const src = (y * D.w + x) * 4;
-          if (D.rgba[src + 3] < 128) continue;
+          if (D.rgba[src + 3] < 16) continue; // keep soft (anti-aliased) edges
           const gx = Math.floor((d.x * R + (d.hflip ? -(D.x0 + x) - 1 : D.x0 + x)) / R);
           if (gx < 0 || gx >= W || owner[gy * W + gx] !== d.id) continue;
           const dst = ((d.vflip ? D.h - 1 - y : y) * D.w + (d.hflip ? D.w - 1 - x : x)) * 4;
           px[dst] = D.rgba[src] + (fr - D.rgba[src]) * fa;
           px[dst + 1] = D.rgba[src + 1] + (fg - D.rgba[src + 1]) * fa;
           px[dst + 2] = D.rgba[src + 2] + (fb - D.rgba[src + 2]) * fa;
-          px[dst + 3] = 255;
+          px[dst + 3] = D.rgba[src + 3];
           any = true;
         }
       }

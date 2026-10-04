@@ -1,7 +1,7 @@
 // Dancer art for Power Calligraphy's Young Stoner Life: a tiny vector rasterizer, the pose -> skeleton rig,
 // and the character drawings. Used by tools/diamond-dancers.mjs (game sheets) and tools/sprite-lab.mjs (lab).
 // Two styles: HD (4x density, fine details) and GBA (true 1x pixel art, see gbaTezzus / gbaDiamond).
-export const D = 4; // HD style: detail pixels per game pixel
+export const D = 4; // Canonical art scale: four crisp source pixels per game pixel.
 export const CELL = { w: 56, h: 46, ax: 28, ay: 42 }; // 1x cell, anchor = sprite origin
 const SCALE = 1.1; // the new characters are a little bigger than the originals
 const OL = 0.9; // outline width (game pixels)
@@ -115,22 +115,28 @@ function shoe(cv, foot, knee, sk, o) {
     return o.color;
   });
 }
-const strands = (base, lit) => (p, X, Y) => ((X + 1000 + Math.floor((Y + 1000) / 6)) % 4 === 0 ? lit : base);
+// Texture is placed on the 4x source grid in deliberate clusters. This keeps the
+// artwork pixel-native while avoiding a noisy one-pixel screen-door pattern.
+const strands = (base, lit) => (p, X, Y) => {
+  const x = Math.floor(X / D), y = Math.floor(Y / D);
+  return ((x + Math.floor(y / 2)) % 5 === 0 ? lit : base);
+};
 
 // ---------- Tezzus ----------
 const TZ = {
-  skin: '#7a4a33', hair: '#15100e', hairLit: '#3b2d27', ink: '#1d120c',
+  skin: '#7a4a33', hair: '#15100e', hairLit: '#3b2d27', ink: INK,
   red: '#cf2229', redDark: '#7a0c12', redLit: '#f4675d', tank: '#f4f1ea',
-  denim: '#a9c2dc', rip: '#f5f7fa', shoe: '#cc1f27', sole: '#f4f1ea',
-  lens: '#2b0d12', lensLit: '#a0707a', silver: '#d7dde6', gold: '#e2b33b',
+  denim: '#a9c2dc', rip: '#f4f1ea', shoe: '#cf2229', sole: '#f4f1ea',
+  lens: '#2b0d12', lensLit: '#cf2229', silver: '#d7dde6', gold: '#e2b33b',
 };
 const TZ_BUILD = { shoulder: 3.4, shoulderDrop: 1.0, hipW: 1.7 };
 // red leather scales: rows of overlapping rounded scales, dark lower rims, a glint on each
 const scales = (p, X, Y) => {
-  const row = Math.floor((Y + 1000) / 5), off = (row & 1) * 3;
-  const cx = (X + 1000 + off) % 6, cy = (Y + 1000) % 5;
-  if (cy === 4 || (cy === 3 && (cx === 0 || cx === 5))) return TZ.redDark;
-  if (cy === 0 && (cx === 2 || cx === 3)) return TZ.redLit;
+  // Each scale is a clear 3x3 logical-pixel cluster on the 4x source grid.
+  const gx = Math.floor(X / D), gy = Math.floor(Y / D), row = Math.floor(gy / 3);
+  const cx = ((gx + (row & 1)) % 3 + 3) % 3, cy = gy % 3;
+  if (cy === 2 || (cy === 1 && (cx === 0 || cx === 2))) return TZ.redDark;
+  if (cy === 0 && cx === 1) return TZ.redLit;
   return TZ.red;
 };
 
@@ -158,7 +164,7 @@ export function tezzus(pose) {
     shoe(cv, foot, knee, sk, { color: TZ.shoe, sole: TZ.sole, rx: 2.5, ry: 1.6, toe: 0.9 });
   });
   // belt with a gold buckle
-  cv.draw(capsule(V.add(hp[0], V.mul(v, -0.4)), V.add(hp[1], V.mul(v, 0.4)), 1.0), '#1b1616');
+  cv.draw(capsule(V.add(hp[0], V.mul(v, -0.4)), V.add(hp[1], V.mul(v, 0.4)), 1.0), INK);
   cv.draw(circle(hip, 0.75), TZ.gold, 0.45);
   // cropped scale jacket, open over a white tank
   const waist = V.add(hip, V.mul(u, -1.0));
@@ -167,7 +173,7 @@ export function tezzus(pose) {
   cv.fill(tank.grow(0.35), INK); // lapel edges
   cv.fill(tank, TZ.tank);
   cv.fill(circle(V.add(neck, V.mul(u, 0.6)), 1.0), TZ.skin); // neckline
-  for (let t = 0; t <= 1; t += 0.04) cv.dot(V.add(V.add(neck, V.mul(v, (t - 0.5) * 2.2)), V.mul(u, 1.4 + Math.sin(t * Math.PI) * 1.2)), TZ.silver); // chain
+  for (let t = 0; t <= 1; t += 0.12) cv.dot(V.add(V.add(neck, V.mul(v, (t - 0.5) * 2.2)), V.mul(u, 1.4 + Math.sin(t * Math.PI) * 1.2)), TZ.silver); // stepped chain links
   // arms: scale sleeves, tattooed hands
   sk.arms.forEach(([elbow, hand], i) => {
     cv.draw(capsule(sh[i], elbow, 1.9, 1.7), scales);
@@ -212,11 +218,15 @@ export function tezzus(pose) {
 // ---------- Diamond* ----------
 const DM = {
   skin: '#5a3526', hair: '#120e0c', hairLit: '#3a2c25', fleece: '#efe6d1', fleeceShade: '#d8ccb3',
-  red: '#c61f29', green: '#1d6a41', gold: '#e4b53b', tee: '#fbfaf6', denim: '#3a5a86', denimDark: '#2a4266',
-  vans: '#1c1c1c', sole: '#f4f4f2', stud: '#dfe6ef', studLit: '#ffffff', studShade: '#8e99a8', eye: '#0b0908',
+  red: '#c61f29', tee: '#fbfaf6', denim: '#3a5a86', denimDark: '#2a4266',
+  vans: INK, sole: '#f4f4f2', stud: '#dfe6ef', studLit: '#ffffff', studShade: '#dfe6ef', eye: INK,
 };
 const DM_BUILD = { shoulder: 3.8, shoulderDrop: 1.1, hipW: 2.0 };
-const sherpa = (p, X, Y) => (((X + 1000) * 5 + (Y + 1000) * 3) % 9 === 0 || ((X + 1000) * 3 + (Y + 1000) * 7) % 11 === 0 ? DM.fleeceShade : DM.fleece);
+const sherpa = (p, X, Y) => {
+  const x = Math.floor(X / D), y = Math.floor(Y / D);
+  const cx = ((x % 7) + 7) % 7, cy = ((y % 5) + 5) % 5;
+  return ((cx === 1 || cx === 2) && (cy === 1 || cy === 2) ? DM.fleeceShade : DM.fleece);
+};
 
 export function diamond(pose) {
   const sk = skeleton(pose, DM_BUILD), cv = new Canvas();
@@ -228,23 +238,11 @@ export function diamond(pose) {
     cv.draw(capsule(knee, foot, 2.0, 2.1), DM.denim);
     shoe(cv, foot, knee, sk, { color: DM.vans, sole: DM.sole, rx: 2.7, ry: 1.6, toe: 1.0, stripe: true });
   });
-  // oversized sherpa fleece: boxy body to the hips, red zip piping, Gucci web patch with gold GG
+  // oversized cream sherpa fleece with red piping, matching the approved Diamond* reference
   const hem = V.add(hip, V.mul(u, 0.9));
   cv.draw(poly([V.add(sh[0], V.mul(v, -1.2)), V.add(sh[1], V.mul(v, 1.2)), V.add(hem, V.mul(v, 4.2)), V.add(hem, V.mul(v, -4.2))]), sherpa);
   cv.fill(poly([V.add(neck, V.mul(v, -1.4)), V.add(neck, V.mul(v, 1.4)), V.add(neck, V.mul(u, 3.0))]), DM.tee); // tee in the collar
   cv.fill(capsule(V.add(neck, V.mul(u, 3.0)), V.add(hem, V.mul(u, -0.2)), 0.28), DM.red); // zip piping
-  if (sk.upright) {
-    const pc = V.add(V.add(neck, V.mul(u, 4.2)), V.mul(v, -2.2));
-    const W = 1.35, H = 2.1;
-    cv.fill(poly([V.add(pc, [-W, -H]), V.add(pc, [W, -H]), V.add(pc, [W, H]), V.add(pc, [-W, H])]), (p) => (Math.abs(p[0] - pc[0]) < W / 3 ? DM.red : DM.green));
-    const G = ['.ggg..', 'g...g.', 'g.....', 'g..gg.', 'g...g.', '.ggg..'];
-    const X0 = Math.round((pc[0] + CELL.ax) * D) - 5, Y0 = Math.round((pc[1] + CELL.ay) * D) - 3;
-    G.forEach((r, j) => [...r].forEach((ch, i) => {
-      if (ch !== 'g') return;
-      cv.px[(Y0 + j) * cv.w + X0 + i] = DM.gold; // G
-      cv.px[(Y0 + j) * cv.w + X0 + 9 - i] = DM.gold; // mirrored G, interlocking
-    }));
-  }
   // puffy sherpa sleeves with red cuffs
   sk.arms.forEach(([elbow, hand], i) => {
     cv.draw(capsule(sh[i], elbow, 2.35, 2.2), sherpa);
@@ -255,6 +253,12 @@ export function diamond(pose) {
   });
   // soft collar with a red edge
   cv.draw(ellipse(V.add(neck, V.mul(u, 0.4)), 3.2, 1.5, Math.atan2(v[1], v[0])), (p) => (V.dist(p, neck) > 2.6 ? DM.red : DM.fleece), 0.7);
+  // long locs hang beside the face and onto the shoulders, behind the head
+  if (!sk.down) for (const s of [-1, 1]) for (let i = 0; i < 2; i++) {
+    const a = V.add(head, [s * (HR * 0.68 + i * 0.55), -0.2 + i * 0.4]);
+    const b = V.add(head, [s * (HR + 0.75 + i * 0.35), 3.6 + i * 0.5]);
+    cv.draw(capsule(a, b, 0.75, 0.55), strands(DM.hair, DM.hairLit), 0.55);
+  }
   // head
   cv.draw(circle(head, HR), DM.skin);
   // hair: dark cap + tied-up dreads fanning from the crown, red tie
@@ -272,10 +276,22 @@ export function diamond(pose) {
   if (!sk.down) cv.draw(ellipse(V.add(crown, [0, -1.0]), 1.2, 0.65), DM.red, 0.55);
   if (!sk.down) {
     const f = sk.facing, fc = V.add(head, [f * 1.2, 0.6]), sp = f ? 0.72 : 1;
-    for (const s of [-1, 1]) {
-      const e = V.add(fc, [s * 1.6 * sp, -0.5]);
-      cv.fill(ellipse(e, 0.55, 0.8), DM.eye);
-      cv.dot(V.add(e, [-0.2, -0.4]), '#ffffff');
+    const lens = (cx, cy) => poly([
+      [cx - 1.2, cy - 0.7], [cx + 1.05, cy - 0.7],
+      [cx + 1.2, cy + 0.35], [cx - 1.0, cy + 0.45],
+    ]);
+    const lensY = fc[1] - 0.5;
+    if (!f) {
+      for (const s of [-1, 1]) {
+        const cx = fc[0] + s * 1.3;
+        cv.draw(lens(cx, lensY), DM.eye, 0.25);
+        cv.fill(capsule([cx - 0.65, lensY - 0.34], [cx + 0.02, lensY - 0.34], 0.09), DM.studLit);
+      }
+      cv.fill(capsule([fc[0] - 0.25, lensY - 0.12], [fc[0] + 0.25, lensY - 0.12], 0.18), DM.eye);
+    } else {
+      const cx = fc[0] + f * 0.75;
+      cv.draw(lens(cx, lensY), DM.eye, 0.25);
+      cv.fill(capsule([cx - f * 0.55, lensY - 0.34], [cx + f * 0.1, lensY - 0.34], 0.09), DM.studLit);
     }
     // small smile
     cv.fill(capsule([fc[0] - 0.95 * sp, fc[1] + 1.85], [fc[0], fc[1] + 2.25], 0.22), DM.eye);
@@ -359,7 +375,8 @@ function stampFace(px, cx, ey, rows, key, skin) {
     if (!c) return;
     const x = ox + i, y = ey + j - rows.findIndex((row) => row.includes('|'));
     const cur = px.get(x, y);
-    if (cur && cur !== INK && (cur === skin || ch === 'K' || ch === 'L' || ch === 'l' || ch === 'k')) px.set(x, y, c);
+    // Face marks are an intentional overlay: forehead jewelry and glasses must remain visible over the hairline.
+    if (cur && cur !== INK && (cur === skin || ch !== '.')) px.set(x, y, c);
   }));
 }
 
@@ -433,8 +450,22 @@ export function gbaTezzus(pose, opts = {}) {
 
 const DM8 = {
   skin: '#6e4130', hair: '#140f0d', hairLit: '#46362d', fleece: '#f1e9d6', fleeceShade: '#cfc2a6', red: '#c61f29',
-  green: '#1d6a41', gold: '#e8bb3e', white: '#fbfaf6', denim: '#3a5a86', denimDark: '#253d5f', vans: '#1d1d1d', stud: '#e6edf5',
+  white: '#fbfaf6', denim: '#3a5a86', denimDark: '#253d5f', vans: '#1d1d1d', stud: '#e6edf5',
+  gucciGreen: '#214b3d', gucciGold: '#d7b34b',
 };
+function gucciBackLayout(sk) {
+  const hem = V.add(sk.hip, V.mul(sk.u, 0.7));
+  const start = V.add(sk.neck, V.mul(sk.u, 0.8));
+  const end = V.add(hem, V.mul(sk.u, -0.5));
+  return { start, end, center: V.lerp(start, end, 0.56), angle: Math.atan2(sk.v[1], sk.v[0]), v: sk.v };
+}
+const outlineRing = (outer, inner) => ({ box: outer.box, test: (p) => outer.test(p) && !inner.test(p) });
+function stripeBand(start, end, v, offset, halfWidth = 0.52) {
+  return poly([
+    V.add(start, V.mul(v, offset - halfWidth)), V.add(start, V.mul(v, offset + halfWidth)),
+    V.add(end, V.mul(v, offset + halfWidth)), V.add(end, V.mul(v, offset - halfWidth)),
+  ]);
+}
 export function gbaDiamond(pose, opts = {}) {
   const head = opts.head ?? 5.4;
   const sk = skeleton(pose, { shoulder: 3.4, shoulderDrop: 1.1, hipW: 1.8 });
@@ -452,11 +483,25 @@ export function gbaDiamond(pose, opts = {}) {
     const dir = lifted ? V.norm(V.sub(foot, knee)) : [out, 0];
     px.paint(ellipse(V.add(foot, V.mul(dir, 0.9)), 2.2, 1.25, Math.atan2(dir[1], dir[0])), (p) => (!lifted && p[1] > foot[1] + 0.7 ? DM8.white : DM8.vans), `shoe${i}`);
   });
-  // boxy sherpa fleece, red zip, Gucci web + gold G on the chest
+  // boxy sherpa fleece, red zip and clean white tee; keep the chest free of logos/stripes
   const hem = V.add(hip, V.mul(u, 0.7));
   const sherpa = (p, x, y) => ((x * 3 + y * 5) % 7 === 0 ? DM8.fleeceShade : DM8.fleece);
   px.paint(poly([V.add(sh[0], V.mul(v, -0.9)), V.add(sh[1], V.mul(v, 0.9)), V.add(hem, V.mul(v, 3.5)), V.add(hem, V.mul(v, -3.5))]), sherpa, 'fleece');
-  px.paint(poly([V.add(neck, V.mul(v, -1.0)), V.add(neck, V.mul(v, 1.0)), V.add(neck, V.mul(u, 2.2))]), DM8.white, 'tee', false);
+  if (sk.down) {
+    const mark = gucciBackLayout(sk);
+    for (const [offset, color] of [[-1.05, DM8.gucciGreen], [0, DM8.red], [1.05, DM8.gucciGreen]])
+      px.paint(stripeBand(mark.start, mark.end, v, offset, 0.48), color, 'fleece', false);
+    const outer = ellipse(mark.center, 2.8, 2.05, mark.angle);
+    const inner = ellipse(mark.center, 2.1, 1.4, mark.angle);
+    px.paint(outlineRing(outer, inner), DM8.gucciGold, 'fleece', false);
+    // Compact runtime-size hint of the intertwined mark; the 4x sheet carries the crisp double-G embroidery.
+    for (const s of [-1, 1]) {
+      const c = V.add(mark.center, V.mul(v, s * 0.45));
+      px.paint(outlineRing(ellipse(c, 0.62, 0.62), ellipse(c, 0.28, 0.28)), DM8.gucciGold, 'fleece', false);
+    }
+  } else {
+    px.paint(poly([V.add(neck, V.mul(v, -1.0)), V.add(neck, V.mul(v, 1.0)), V.add(neck, V.mul(u, 2.2))]), DM8.white, 'tee', false);
+  }
   // sleeves + red cuffs + hands
   sk.arms.forEach(([elbow, hand], i) => {
     const hd = V.norm(V.sub(hand, elbow)), wrist = V.add(hand, V.mul(hd, -1.0));
@@ -475,6 +520,8 @@ export function gbaDiamond(pose, opts = {}) {
       const a = -Math.PI / 2 + k * 0.45, L = 3.6 - Math.abs(k) * 0.3;
       px.paint(capsule(V.add(crown, [0, -0.5]), V.add(crown, [Math.cos(a) * L, Math.sin(a) * L + Math.abs(k) * 0.4]), 0.75, 0.6), hairTex, 'locs');
     }
+    for (const s of [-1, 1])
+      px.paint(capsule(V.add(hc, [s * (head - 1.0), -0.1]), V.add(hc, [s * (head + 1.0), 3.6]), 0.8, 0.6), hairTex, 'sideLocs', false);
   }
   px.outline();
   if (!sk.down) {
@@ -486,18 +533,41 @@ export function gbaDiamond(pose, opts = {}) {
       '....o....',
       '....O....',
       '....o....',
-      '.WK..|KW.',
+      '.WSS|SSW.',
+      '.SSS|SSS.',
       'o.......o',
       '.o.....o.',
       '..oMMMo..',
-    ], { o: DM8.stud, O: '#ffffff', W: '#ffffff', K: INK, M: INK }, DM8.skin);
-  }
-  // web stripe + gold G on the chest when upright
-  if (sk.upright) {
-    const c = V.add(V.add(neck, V.mul(u, 3.4)), V.mul(v, -1.9));
-    const x0 = R(c[0]) - 1, y0 = R(c[1]) - 1;
-    for (let j = 0; j < 3; j++)
-      for (let i = 0; i < 3; i++) if (px.get(x0 + i, y0 + j) && px.get(x0 + i, y0 + j) !== INK) px.set(x0 + i, y0 + j, i === 1 ? (j === 1 ? DM8.gold : DM8.red) : DM8.green);
+    ], { o: DM8.stud, O: '#ffffff', W: '#ffffff', S: INK, '|': INK, M: INK }, DM8.skin);
   }
   return px;
+}
+
+// 4x embroidered back detail: the same Mini B silhouette, with enough source pixels for the GG mark to read.
+export function diamondBackDetail4x(pose) {
+  const cv = new Canvas(D), sk = skeleton(pose, { shoulder: 3.4, shoulderDrop: 1.1, hipW: 1.8 });
+  if (!sk.down) return cv;
+  const mark = gucciBackLayout(sk);
+  for (const [offset, color] of [[-1.05, DM8.gucciGreen], [0, DM8.red], [1.05, DM8.gucciGreen]]) {
+    const band = stripeBand(mark.start, mark.end, sk.v, offset, 0.48);
+    cv.fill(band, color);
+  }
+  const outer = ellipse(mark.center, 2.8, 2.05, mark.angle);
+  const inner = ellipse(mark.center, 2.45, 1.7, mark.angle);
+  cv.fill(outlineRing(outer, inner), DM8.gucciGold);
+
+  const glyph = ['01110', '10001', '10000', '10111', '10001', '10001', '01110'];
+  const pitch = 0.42, cellW = 0.2, cellH = 0.24;
+  for (let letter = 0; letter < 2; letter++) for (let y = 0; y < glyph.length; y++) for (let x = 0; x < 5; x++) {
+    if (glyph[y][x] !== '1') continue;
+    const col = letter * 6 + x, across = (col - 5) * pitch, along = (y - 3) * pitch;
+    const c = V.add(mark.center, V.add(V.mul(sk.v, across), V.mul(sk.u, along)));
+    cv.fill(poly([
+      V.add(c, V.add(V.mul(sk.v, -cellW), V.mul(sk.u, -cellH))),
+      V.add(c, V.add(V.mul(sk.v, cellW), V.mul(sk.u, -cellH))),
+      V.add(c, V.add(V.mul(sk.v, cellW), V.mul(sk.u, cellH))),
+      V.add(c, V.add(V.mul(sk.v, -cellW), V.mul(sk.u, cellH))),
+    ]), DM8.gucciGold);
+  }
+  return cv;
 }
