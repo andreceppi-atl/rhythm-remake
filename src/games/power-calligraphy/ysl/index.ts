@@ -217,12 +217,10 @@ export interface YslContent {
 }
 
 // Adds the custom characters to the Power Calligraphy data + tuning. Call once, before rt.load(data).
-// Start the dancers (people state 1 = dance) and shift both columns 160 px so they are on screen right away.
+// Start the dancers (people state 1 = dance); they scroll in from off screen, as in the original's second half.
 export const DANCERS_ON: Op[] = [
   ['run', 'gameplay_set_engine_event_param', 1],
   ['run2', 'gameplay_run_engine_event', 11, 'power_calligraphy_engine'],
-  ['run', 'gameplay_set_engine_event_param', 160],
-  ['run2', 'gameplay_run_engine_event', 12, 'power_calligraphy_engine'],
 ];
 
 export function addYoungStonerLife(data: GameData, t: PcTuning): YslContent {
@@ -384,13 +382,9 @@ function addCalligraphyLevel(data: GameData, t: PcTuning, L: LevelSpec): YslCont
   // The level: the original main script, slot for slot, with the custom characters swapped in.
   const criteriaOf = Object.fromEntries(PLANS.map((p) => [p.id, p.criteria]));
   const main: Op[] = [];
-  let pendingCriteria = -1, dancing = false;
+  // Tezzus + Diamond* come out halfway through, where the original's own dance event starts them.
+  let pendingCriteria = -1;
   for (const op of data.level.scripts.script_power_calligraphy_main) {
-    // Tezzus + Diamond* dance from the first character, already on screen (the original waits for the second half).
-    if (!dancing && op[0] === 'call' && String(op[1]).endsWith('_init')) {
-      main.push(...DANCERS_ON);
-      dancing = true;
-    }
     if (op[0] === 'call') {
       const m = String(op[1]).match(/^script_power_calligraphy_sub_(\w+?)(_init)?$/);
       if (m && SLOT[m[1]]) {

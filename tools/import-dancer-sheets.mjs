@@ -15,6 +15,7 @@ import { ROOT } from './lib/decomp.mjs';
 import { decodePng, Image } from './lib/png.mjs';
 
 const D = 4; // detail pixels per game pixel (the sheets are drawn at this density)
+const SATURATION = 1.25; // colour boost over the sheets (Andre: "saturate it a little more")
 const CELL = { w: 56, h: 46, ax: 28, ay: 42 };
 const COLS = 9;
 const sheets = [
@@ -56,6 +57,14 @@ function frames(im, y0, y1) {
     for (let x = s; x <= e; x++) for (let y = y0; y < y1; y++) if (A(x, y) > 40) { t = Math.min(t, y); b = Math.max(b, y); }
     return { x0: s, x1: e, y0: t, y1: b };
   });
+}
+
+// Push a pixel's colour away from its grey (luma) by SATURATION.
+function saturate(p) {
+  const r = p >>> 24, g = (p >>> 16) & 255, b = (p >>> 8) & 255;
+  const L = 0.299 * r + 0.587 * g + 0.114 * b;
+  const c = (v) => Math.max(0, Math.min(255, Math.round(L + (v - L) * SATURATION)));
+  return ((c(r) << 24) | (c(g) << 16) | (c(b) << 8) | (p & 255)) >>> 0;
 }
 
 // The frame as its own image, scaled by k <= 1 (area average, premultiplied alpha).
@@ -101,7 +110,7 @@ for (const s of sheets) {
     const top = (CELL.ay + o.bottom) * D - (f.y1 - f.y0 + 1);
     for (let y = f.y0; y <= f.y1; y++)
       for (let x = f.x0; x <= f.x1; x++) {
-        const p = f.im.px[y * f.im.w + x];
+        const p = saturate(f.im.px[y * f.im.w + x]);
         if ((p & 255) < 16) continue;
         const X = left + x - f.x0, Y = top + y - f.y0;
         if (X < 0 || Y < 0 || X >= CELL.w * D || Y >= CELL.h * D) throw new Error(`${name}: frame doesn't fit the ${CELL.w}x${CELL.h} cell`);

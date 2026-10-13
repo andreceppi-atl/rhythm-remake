@@ -44,6 +44,8 @@ export class PowerCalligraphy implements GameModule {
   private people: Person[] = [];
   private danceTimer = 0; // ticks until the dancers switch side
   private danceSide = 0;
+  private danceBeats = 1; // beats per dance move: the Diamond* look dances at half speed
+  private slowAnims = new Map<string, Animation>();
   private peopleState = STATE_NULL;
   private peopleReturnState = STATE_NULL;
   private stumbleTimer = 0;
@@ -155,6 +157,7 @@ export class PowerCalligraphy implements GameModule {
   // ---- little people (dancers) ----
   private initPeople() {
     const L = this.t.layout.people;
+    this.danceBeats = this.rt.look === 'diamond-star' ? 2 : 1;
     this.people = [];
     const starts = [
       { x: L.mColumnX, y: L.mStartY },
@@ -181,7 +184,24 @@ export class PowerCalligraphy implements GameModule {
       ['people_m_dance_l', 'people_m_dance_r'],
       ['people_w_dance_r', 'people_w_dance_l'],
     ];
-    return this.anim(table[type][side]);
+    const a = this.anim(table[type][side]);
+    if (this.danceBeats === 1 || !this.rt.tempo) return a;
+    // Stretch the move over danceBeats beats at the current tempo, keeping the original hold proportions.
+    const target = (this.danceBeats * 3600) / this.rt.tempo;
+    const total = a.reduce((n, f) => n + f.frames, 0);
+    const key = `${table[type][side]}@${Math.round(target)}`;
+    let slow = this.slowAnims.get(key);
+    if (!slow) {
+      let acc = 0, used = 0;
+      slow = a.map((f) => {
+        acc += (f.frames * target) / total;
+        const frames = Math.max(1, Math.round(acc) - used);
+        used += frames;
+        return { cel: f.cel, frames };
+      });
+      this.slowAnims.set(key, slow);
+    }
+    return slow;
   }
 
   private setPeopleState(state: number) {
@@ -222,7 +242,7 @@ export class PowerCalligraphy implements GameModule {
     let swap = false;
     this.danceTimer -= (this.rt.tempo * 24) / 3600; // ticks per frame
     if (this.danceTimer < 0) {
-      this.danceTimer += 24;
+      this.danceTimer += 24 * this.danceBeats;
       this.danceSide ^= 1;
       swap = true;
     }

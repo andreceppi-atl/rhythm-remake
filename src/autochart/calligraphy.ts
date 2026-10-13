@@ -88,13 +88,19 @@ export function calligraphyLevel(level: LevelData, grid: Analysis, set: Calligra
   restTo(at - 24);
   ops.push(['run2', 'gameplay_run_common_event', 1, 0]);
   ops.push(['run', 'gameplay_start_perfect_campaign']);
-  if (set !== 'pc') ops.push(...DANCERS_ON); // Tezzus + Diamond* dance the whole song
+  // Tezzus + Diamond* come out at the first slot past the halfway point (like the original's second half).
+  const half = (at + endTick) / 2;
+  let dancing = set === 'pc';
   let i = 0, slots = 0;
   for (;;) {
     let next = loop[i % loop.length];
     const fitsNext = at + next.ticks + finale.ticks + bar <= endTick;
     if (!fitsNext) next = finale;
     restTo(at);
+    if (!dancing && (at >= half || next === finale)) {
+      ops.push(...DANCERS_ON);
+      dancing = true;
+    }
     ops.push(
       ['run', 'gameplay_set_engine_event_param', 0],
       ['run2', 'gameplay_run_engine_event', 3, ENGINE],
