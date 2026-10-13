@@ -45,6 +45,7 @@ export class PowerCalligraphy implements GameModule {
   private danceTimer = 0; // ticks until the dancers switch side
   private danceSide = 0;
   private danceBeats = 1; // beats per dance move: the Diamond* look dances at half speed
+  private peopleLayout!: PcTuning['layout']['people'];
   private slowAnims = new Map<string, Animation>();
   private peopleState = STATE_NULL;
   private peopleReturnState = STATE_NULL;
@@ -156,8 +157,15 @@ export class PowerCalligraphy implements GameModule {
 
   // ---- little people (dancers) ----
   private initPeople() {
-    const L = this.t.layout.people;
-    this.danceBeats = this.rt.look === 'diamond-star' ? 2 : 1;
+    const diamond = this.rt.look === 'diamond-star';
+    this.danceBeats = diamond ? 2 : 1;
+    // The Diamond* dancers are taller than the original's (32 px vs 28), so their columns are spaced wider;
+    // the left column still ends just above the screen so they only come out when the dance starts.
+    const base = this.t.layout.people;
+    const spacing = diamond ? 38 : base.spacing;
+    const L = (this.peopleLayout = diamond
+      ? { ...base, spacing, wrap: spacing * base.perColumn, mStartY: -spacing * (base.perColumn - 1) }
+      : base);
     this.people = [];
     const starts = [
       { x: L.mColumnX, y: L.mStartY },
@@ -238,7 +246,7 @@ export class PowerCalligraphy implements GameModule {
   }
 
   private updatePeople() {
-    const L = this.t.layout.people;
+    const L = this.peopleLayout;
     let swap = false;
     this.danceTimer -= (this.rt.tempo * 24) / 3600; // ticks per frame
     if (this.danceTimer < 0) {

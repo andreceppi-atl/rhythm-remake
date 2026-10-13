@@ -15,12 +15,21 @@ import { ROOT } from './lib/decomp.mjs';
 import { decodePng, Image } from './lib/png.mjs';
 
 const D = 4; // detail pixels per game pixel (the sheets are drawn at this density)
-const SATURATION = 1.25; // colour boost over the sheets (Andre: "saturate it a little more")
+const SATURATION = 1.5; // colour boost over the sheets (Andre: "saturate it a little more", then "further")
 const CELL = { w: 56, h: 46, ax: 28, ay: 42 };
 const COLS = 9;
+// Hair colour is matched across frames (the sheets drift: Tezzus's hair is lighter in some frames, Diamond*'s
+// dreads are lighter in the bow/fall row). Brown pixels are sorted into hair / not hair by the nearest of these
+// colour clusters (measured from the sheets), then each frame's hair is scaled to the dance row's average hair.
 const sheets = [
-  { who: 'tezzus', file: process.argv[2] ?? join(ROOT, 'art', 'ysl-dancers', 'tezzus-sheet.png'), first: 0 },
-  { who: 'diamond', file: process.argv[3] ?? join(ROOT, 'art', 'ysl-dancers', 'diamond-sheet.png'), first: 17 },
+  {
+    who: 'tezzus', file: process.argv[2] ?? join(ROOT, 'art', 'ysl-dancers', 'tezzus-sheet.png'), first: 0,
+    hair: ['#442c24', '#5e3e32'], other: ['#2a1913', '#b01619', '#6e0708', '#a47d79', '#834f38', '#2e0201'],
+  },
+  {
+    who: 'diamond', file: process.argv[3] ?? join(ROOT, 'art', 'ysl-dancers', 'diamond-sheet.png'), first: 17,
+    hair: ['#231a17', '#33251e'], other: ['#260e06', '#8a7866', '#763e29', '#523122', '#5f4c3f', '#b4a491'],
+  },
 ];
 
 // Original cel bounds (1x), to stand each new frame where the old one stood.
@@ -57,6 +66,42 @@ function frames(im, y0, y1) {
     for (let x = s; x <= e; x++) for (let y = y0; y < y1; y++) if (A(x, y) > 40) { t = Math.min(t, y); b = Math.max(b, y); }
     return { x0: s, x1: e, y0: t, y1: b };
   });
+}
+
+const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+const channels = (p) => [p >>> 24, (p >>> 16) & 255, (p >>> 8) & 255];
+function isHair(p, s) {
+  if ((p & 255) < 128) return false;
+  const c = channels(p);
+  const mx = Math.max(...c), mn = Math.min(...c);
+  if (mx < 28 || mx > 200 || mx - mn < 0.12 * mx || c[2] > c[0]) return false; // browns only
+  const d = (k) => (c[0] - k[0]) ** 2 + (c[1] - k[1]) ** 2 + (c[2] - k[2]) ** 2;
+  return Math.min(...s.hair.map((h) => d(rgb(h)))) < Math.min(...s.other.map((h) => d(rgb(h))));
+}
+function hairMean(im, f, s) {
+  const sum = [0, 0, 0];
+  let n = 0;
+  for (let y = f.y0; y <= f.y1; y++)
+    for (let x = f.x0; x <= f.x1; x++) {
+      const p = im.px[y * im.w + x];
+      if (!isHair(p, s)) continue;
+      channels(p).forEach((v, i) => (sum[i] += v));
+      n++;
+    }
+  return n ? sum.map((v) => v / n) : null;
+}
+// Scale the frame's hair pixels so their average matches target.
+function matchHair(im, f, s, target) {
+  const mean = hairMean(im, f, s);
+  if (!mean) return;
+  const k = mean.map((v, i) => target[i] / v);
+  for (let y = f.y0; y <= f.y1; y++)
+    for (let x = f.x0; x <= f.x1; x++) {
+      const i = y * im.w + x, p = im.px[i];
+      if (!isHair(p, s)) continue;
+      const c = channels(p).map((v, j) => Math.max(0, Math.min(255, Math.round(v * k[j]))));
+      im.px[i] = ((c[0] << 24) | (c[1] << 16) | (c[2] << 8) | (p & 255)) >>> 0;
+    }
 }
 
 // Push a pixel's colour away from its grey (luma) by SATURATION.
@@ -97,6 +142,9 @@ for (const s of sheets) {
   const mid = Math.floor(im.h / 2);
   const found = [...frames(im, 0, mid), ...frames(im, mid, im.h)];
   if (found.length !== 17) throw new Error(`${s.file}: found ${found.length} frames, expected 17 (9 + 8)`);
+  const means = found.slice(0, 9).map((f) => hairMean(im, f, s)).filter(Boolean);
+  const target = [0, 1, 2].map((i) => means.reduce((a, m) => a + m[i], 0) / means.length);
+  for (const f of found) matchHair(im, f, s, target);
   const cap = Math.max(...found.slice(0, 9).map(side));
   const rowK = Math.min(1, cap / Math.max(...found.slice(9).map(side)));
   const scaled = found.map((r, i) => fit(im, r, i < 9 ? 1 : rowK));
