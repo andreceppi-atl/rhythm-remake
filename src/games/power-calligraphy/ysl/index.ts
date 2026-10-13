@@ -1,4 +1,5 @@
-// "Young Stoner Life": custom Power Calligraphy characters generated from KanjiVG stroke data.
+// Custom Power Calligraphy levels: "Young Stoner Life" and "Shine Bright Diamond", generated from KanjiVG
+// stroke data (and, for the Shine Bright Diamond finale, a brush portrait of Diamond* drawn as strokes).
 //
 // For each kanji this builds, entirely at load time:
 //   - the character sprite: frame 0 = grey preview of every stroke, then ink progress frames for each
@@ -17,17 +18,20 @@ import type { PcTuning, Stroke } from '../tuning';
 import kanjiData from './kanji-data.json';
 
 export const YSL_SCENE = 'scene_pc_ysl';
+export const SBD_SCENE = 'scene_pc_sbd';
 const ENGINE = 'power_calligraphy_engine';
 
 interface Plan {
   id: string;
-  char: string;
+  char: string; // the kanji (KanjiVG strokes), or a label when `strokes` is given
+  strokes?: KStroke[]; // hand-made strokes (the portrait)
+  brush?: number; // brush radius override
   players: { stroke: number; hit: number }[]; // 1-based stroke number, hit beat within the sub
   beats: number;
   criteria: number; // marking criteria (0 basic, 1 power, 2 two-stroke, 3 finale)
 }
 
-const PLANS: Plan[] = [
+const YSL_PLANS: Plan[] = [
   { id: 'sei', char: '生', players: [{ stroke: 5, hit: 6 }], beats: 7, criteria: 0 },
   { id: 'shou', char: '少', players: [{ stroke: 4, hit: 6 }], beats: 7, criteria: 0 },
   { id: 'kusa', char: '草', players: [{ stroke: 8, hit: 6 }], beats: 7, criteria: 1 },
@@ -36,7 +40,7 @@ const PLANS: Plan[] = [
 ];
 
 // Which custom character replaces each original subroutine in the main script.
-const SLOT: Record<string, string> = { re: 'sei', sun: 'sei', comma: 'shou', chikara: 'kusa', onore: 'seki', kokoro: 'seki', face: 'waka' };
+const YSL_SLOT: Record<string, string> = { re: 'sei', sun: 'sei', comma: 'shou', chikara: 'kusa', onore: 'seki', kokoro: 'seki', face: 'waka' };
 
 const PREVIEW = [0xe7, 0xe7, 0xe7];
 const INK = [0, 0, 0];
@@ -44,7 +48,63 @@ const BRUSH_TIP_DOWN = 15; // brush contact point below the sprite anchor (measu
 const BRUSH_TIP_UP = 30;
 
 type Pt = [number, number];
-type KStroke = { type: string; points: Pt[] };
+type KStroke = { type: string; points: Pt[] }; // type: a KanjiVG stroke type, 'line', or 'dots' (studs at each point)
+
+// Smooth a few control points into a dense polyline (Catmull-Rom), in portrait units mapped onto the paper.
+function curve(ctrl: Pt[], type = 'line'): KStroke {
+  const P = (p: Pt): Pt => [4 + p[0] * 0.85, -8 + p[1] * 0.85];
+  const c = ctrl.map(P);
+  const pts: Pt[] = [];
+  for (let i = 0; i < c.length - 1; i++) {
+    const p0 = c[Math.max(0, i - 1)], p1 = c[i], p2 = c[i + 1], p3 = c[Math.min(c.length - 1, i + 2)];
+    for (let k = 0; k < 10; k++) {
+      const t = k / 10, t2 = t * t, t3 = t2 * t;
+      const f = (a: number, b: number, cc: number, d: number) => 0.5 * (2 * b + (-a + cc) * t + (2 * a - 5 * b + 4 * cc - d) * t2 + (-a + 3 * b - 3 * cc + d) * t3);
+      pts.push([f(p0[0], p1[0], p2[0], p3[0]), f(p0[1], p1[1], p2[1], p3[1])]);
+    }
+  }
+  pts.push(c[c.length - 1]);
+  return { type, points: pts };
+}
+const dots = (ctrl: Pt[]): KStroke => ({ type: 'dots', points: ctrl.map((p): Pt => [4 + p[0] * 0.85, -8 + p[1] * 0.85]) });
+
+// Diamond* in brush strokes (after his portrait): face, tied-up dreads, brows, eyes, nose, lips, and the nine
+// piercings: cheekbones, dimples, bottom corners of the mouth, and 3 descending down the forehead (the finale stroke).
+const PORTRAIT: KStroke[] = [
+  curve([[-25, -30], [-29, -6], [-24, 17], [-12, 32], [0, 37]]), // face, left
+  curve([[25, -30], [29, -6], [24, 17], [12, 32], [0, 37]]), // face, right
+  curve([[-26, -29], [-14, -36], [0, -38], [14, -36], [26, -29]]), // hairline
+  curve([[-2, -38], [-8, -46], [-15, -52]], '㇒'), // dread bundle, tied up
+  curve([[2, -38], [7, -47], [15, -52]], '㇏'),
+  curve([[-27, -30], [-35, -4], [-38, 22], [-36, 44]], '㇒'), // dreads hanging, left
+  curve([[-21, -35], [-31, -8], [-32, 20], [-29, 42]], '㇒'),
+  curve([[27, -30], [35, -4], [38, 22], [36, 44]], '㇏'), // dreads hanging, right
+  curve([[21, -35], [31, -8], [32, 20], [29, 42]], '㇏'),
+  curve([[-20, -15], [-13, -17], [-6, -14]]), // brows
+  curve([[6, -14], [13, -17], [20, -15]]),
+  curve([[-17, -3], [-12, -5], [-7, -3]]), // eyes
+  curve([[7, -3], [12, -5], [17, -3]]),
+  curve([[2, -3], [4, 7], [0, 10]], '㇚'), // nose
+  curve([[-9, 19], [0, 22], [9, 19]]), // lips (player)
+  dots([[-21, 5], [21, 5]]), // cheekbones
+  dots([[-16, 14], [16, 14]]), // dimples
+  dots([[-12, 26], [12, 26]]), // bottom corners of the mouth
+  dots([[0, -33], [0, -27], [0, -21]]), // 3 descending on the forehead (player, last)
+];
+
+const SBD_PLANS: Plan[] = [
+  { id: 'hikari', char: '光', players: [{ stroke: 6, hit: 6 }], beats: 7, criteria: 0 }, // SHINE
+  { id: 'mei', char: '明', players: [{ stroke: 5, hit: 6 }], beats: 7, criteria: 0 }, // BRIGHT
+  { id: 'kin', char: '金', players: [{ stroke: 8, hit: 6 }], beats: 7, criteria: 1 }, // DIAMOND = 金剛石
+  { id: 'gou', char: '剛', players: [{ stroke: 2, hit: 3 }, { stroke: 10, hit: 6 }], beats: 7, criteria: 2 },
+  { id: 'ishi', char: '石', players: [{ stroke: 2, hit: 3 }, { stroke: 5, hit: 6 }], beats: 7, criteria: 2 },
+  { id: 'diamond', char: 'Diamond*', strokes: PORTRAIT, brush: 2.4, players: [{ stroke: 15, hit: 9 }, { stroke: 19, hit: 14 }], beats: 15, criteria: 3 },
+];
+const SBD_SLOT: Record<string, string> = { re: 'hikari', sun: 'mei', comma: 'mei', chikara: 'kin', onore: 'gou', kokoro: 'ishi', face: 'diamond' };
+
+interface LevelSpec { key: string; scene: string; plans: Plan[]; slot: Record<string, string> }
+const YSL: LevelSpec = { key: 'ysl', scene: YSL_SCENE, plans: YSL_PLANS, slot: YSL_SLOT };
+const SBD: LevelSpec = { key: 'sbd', scene: SBD_SCENE, plans: SBD_PLANS, slot: SBD_SLOT };
 
 function length(pts: Pt[]) {
   let L = 0;
@@ -105,7 +165,18 @@ class Canvas {
     this.ctx.arc(x - this.x0, y - this.y0, Math.max(0.6, r), 0, Math.PI * 2);
     this.ctx.fill();
   }
+  // A stud: an ink ring with a clear centre, so it reads as metal rather than an eye.
+  ring(x: number, y: number, rgb: number[]) {
+    this.dab(x, y, 2.4, rgb);
+    this.ctx.globalCompositeOperation = 'destination-out';
+    this.dab(x, y, 1.0, rgb);
+    this.ctx.globalCompositeOperation = 'source-over';
+  }
   stroke(s: KStroke, rgb: number[], from = 0, to = 1) {
+    if (s.type === 'dots') {
+      s.points.forEach((p, i) => { if ((i + 1) / s.points.length <= to + 1e-6 && (i + 1) / s.points.length > from) this.ring(p[0], p[1], rgb); });
+      return;
+    }
     const L = length(s.points);
     for (let d = L * from; d <= L * to; d += 0.5) {
       const [x, y] = pointAt(s.points, d / L);
@@ -155,14 +226,22 @@ export const DANCERS_ON: Op[] = [
 ];
 
 export function addYoungStonerLife(data: GameData, t: PcTuning): YslContent {
+  return addCalligraphyLevel(data, t, YSL);
+}
+export function addShineBrightDiamond(data: GameData, t: PcTuning): YslContent {
+  return addCalligraphyLevel(data, t, SBD);
+}
+
+function addCalligraphyLevel(data: GameData, t: PcTuning, L: LevelSpec): YslContent {
+  const { key, plans: PLANS, slot: SLOT } = L;
   const raster = (data.raster ??= new Map<Cel, RasterCel>());
   const kanaBase = t.kanaAnims.length;
   const scripts: Record<string, Op[]> = {};
   const bbox = { x0: -58, y0: -64, w: 124, h: 116 }; // covers every character + brush blots
 
   PLANS.forEach((plan, pi) => {
-    const strokes = (kanjiData.kanji as unknown as Record<string, { strokes: KStroke[] }>)[plan.char].strokes;
-    brushR = strokes.length >= 8 ? 2.6 : strokes.length >= 6 ? 2.9 : 3.2;
+    const strokes = plan.strokes ?? (kanjiData.kanji as unknown as Record<string, { strokes: KStroke[] }>)[plan.char].strokes;
+    brushR = plan.brush ?? (strokes.length >= 8 ? 2.6 : strokes.length >= 6 ? 2.9 : 3.2);
     const playerIdx = plan.players.map((p) => p.stroke - 1);
     const scripted = strokes.map((_, i) => i).filter((i) => !playerIdx.includes(i));
     const steps = (s: KStroke) => Math.max(2, Math.min(5, Math.round(length(s.points) / 12)));
@@ -187,8 +266,8 @@ export function addYoungStonerLife(data: GameData, t: PcTuning): YslContent {
       for (let j = 1; j <= n; j++) celOf.set(`${i}:${j}`, j === n ? makeFrame([...done, i]) : makeFrame(done, { i, f: j / n }));
       done.push(i);
     }
-    data.anims[`anim_power_calligraphy_ysl_${plan.id}`] = frames;
-    t.kanaAnims.push(`ysl_${plan.id}`);
+    data.anims[`anim_power_calligraphy_${key}_${plan.id}`] = frames;
+    t.kanaAnims.push(`${key}_${plan.id}`);
     const kanaIndex = kanaBase + pi;
 
     // Player strokes: clean / early scribble / late blot.
@@ -207,7 +286,7 @@ export function addYoungStonerLife(data: GameData, t: PcTuning): YslContent {
       for (let k = 0; k < 7; k++) late.dab(sx + (rand() - 0.5) * 6, sy + (rand() - 0.5) * 6, 2.5 + rand() * 2.5, INK);
       late.stroke(s, INK, 0, 0.15);
       for (let k = 0; k < 4; k++) late.dab(sx + (rand() - 0.5) * 22, sy + (rand() - 0.5) * 22, 0.9 + rand(), INK);
-      const anim = `ysl_${plan.id}_input${i + 1}`;
+      const anim = `${key}_${plan.id}_input${i + 1}`;
       data.anims[`anim_power_calligraphy_${anim}`] = [clean, early, late].map((c) => {
         const cel: Cel = [];
         raster.set(cel, c.raster());
@@ -296,10 +375,10 @@ export function addYoungStonerLife(data: GameData, t: PcTuning): YslContent {
     }
     if (plan.beats * 24 > now) ops.push(['rest', plan.beats * 24 - now]);
     ops.push(['return']);
-    scripts[`script_pc_ysl_sub_${plan.id}`] = ops;
+    scripts[`script_pc_${key}_sub_${plan.id}`] = ops;
 
     const first = strokes[scripted[0] ?? playerIdx[0]].points[0];
-    scripts[`script_pc_ysl_sub_${plan.id}_init`] = [...ev(0, kanaIndex), ...ev(1, 0), ...brushOp(first[0], first[1], false), ...paperOp(0, 0), ['rest', 24], ['return']];
+    scripts[`script_pc_${key}_sub_${plan.id}_init`] = [...ev(0, kanaIndex), ...ev(1, 0), ...brushOp(first[0], first[1], false), ...paperOp(0, 0), ['rest', 24], ['return']];
   });
 
   // The level: the original main script, slot for slot, with the custom characters swapped in.
@@ -317,15 +396,15 @@ export function addYoungStonerLife(data: GameData, t: PcTuning): YslContent {
       if (m && SLOT[m[1]]) {
         const id = SLOT[m[1]];
         if (!m[2] && pendingCriteria >= 0) main[pendingCriteria] = ['run', 'gameplay_set_marking_criteria', criteriaOf[id]];
-        main.push(['call', `script_pc_ysl_sub_${id}${m[2] ?? ''}`]);
+        main.push(['call', `script_pc_${key}_sub_${id}${m[2] ?? ''}`]);
         continue;
       }
     }
     if (op[0] === 'run' && op[1] === 'gameplay_set_marking_criteria') pendingCriteria = main.length;
     main.push(op);
   }
-  scripts.script_pc_ysl_main = main;
-  scripts.script_pc_ysl_entry = [
+  scripts[`script_pc_${key}_main`] = main;
+  scripts[`script_pc_${key}_entry`] = [
     ['run', 'set_beatscript_tempo', 124],
     ['rest', 24],
     ['call', 'script_power_calligraphy_prologue'],
@@ -335,7 +414,7 @@ export function addYoungStonerLife(data: GameData, t: PcTuning): YslContent {
     ['run', 'results_enable_input_tracking', 1],
     ['run', 'set_beatscript_tempo', 120],
     ['rest', 24],
-    ['call', 'script_pc_ysl_main'],
+    ['call', `script_pc_${key}_main`],
     ['run', 'pause_menu_enabled', 0],
     ['run', 'gameplay_inputs_enabled', 0],
     ['fade_music_out', 48],
@@ -345,6 +424,6 @@ export function addYoungStonerLife(data: GameData, t: PcTuning): YslContent {
     ['stop'],
   ];
   Object.assign(data.level.scripts, scripts);
-  data.level.scenes[YSL_SCENE] = 'script_pc_ysl_entry';
-  return { scenes: { [YSL_SCENE]: 'script_pc_ysl_entry' }, chars: PLANS.map((p) => p.char) };
+  data.level.scenes[L.scene] = `script_pc_${key}_entry`;
+  return { scenes: { [L.scene]: `script_pc_${key}_entry` }, chars: PLANS.map((p) => p.char) };
 }

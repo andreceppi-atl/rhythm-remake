@@ -12,7 +12,7 @@ import { calligraphyLevel, PC_SONG_SCENES, type CalligraphySet } from './autocha
 import { PowerCalligraphy } from './games/power-calligraphy';
 import { loadPcTuning } from './games/power-calligraphy/tuning';
 import { PC_TEXT_EN } from './games/power-calligraphy/text-en';
-import { addYoungStonerLife, YSL_SCENE } from './games/power-calligraphy/ysl';
+import { addShineBrightDiamond, addYoungStonerLife, SBD_SCENE, YSL_SCENE } from './games/power-calligraphy/ysl';
 import { loadDancerLook, loadHandLook } from './games/power-calligraphy/hand-look';
 import type { PcTuning } from './games/power-calligraphy/tuning';
 import type { GameData } from './gba/assets';
@@ -121,7 +121,10 @@ async function ensureGame(game: string) {
     $('loading').hidden = false;
     $('loading').textContent = `Loading ${GAME_TITLES[game] ?? game}…`;
     data = await loadGameData(game, game === 'karate_man' ? KM_SKIN : undefined);
-    if (game === 'power_calligraphy' && pcTuning) addYoungStonerLife(data, pcTuning);
+    if (game === 'power_calligraphy' && pcTuning) {
+      addYoungStonerLife(data, pcTuning);
+      addShineBrightDiamond(data, pcTuning);
+    }
     if (game === 'power_calligraphy') {
       try {
         const dir = `${import.meta.env.BASE_URL}skins/diamond-star/calligraphy/`;
@@ -148,9 +151,10 @@ async function play(scene: string, auto?: boolean) {
   }
   await ensureGame(scene === CUSTOM_SCRIPT ? 'karate_man' : gameOfScene(scene));
   if (prologue && (scene === YSL_SCENE || scene === PC_SONG_SCENES.ysl)) prologue.title = 'Young Stoner Life';
+  else if (prologue && (scene === SBD_SCENE || scene === PC_SONG_SCENES.sbd)) prologue.title = 'Shine Bright Diamond';
   else if (prologue && gameOfScene(scene) === 'power_calligraphy') prologue.title = GAME_TITLES.power_calligraphy;
   // Young Stoner Life (and songs played on it) uses Diamond*'s hand + dancers
-  rt.look = scene === YSL_SCENE || scene === PC_SONG_SCENES.ysl ? 'diamond-star' : null;
+  rt.look = [YSL_SCENE, PC_SONG_SCENES.ysl, SBD_SCENE, PC_SONG_SCENES.sbd].includes(scene) ? 'diamond-star' : null;
   lastScene = scene;
   menu.hidden = true;
   importPanel.hidden = true; // the song screen, when a game was started from it
@@ -278,6 +282,7 @@ const ORIGINALS: { title: string; games: { label: string; scene: string; skip?: 
     games: [
       { label: 'Power Calligraphy', scene: 'scene_power_calligraphy', skip: 'scene_power_calligraphy_skipped_practice' },
       { label: 'Young Stoner Life', scene: YSL_SCENE, hint: '若 少 石 草 生' },
+      { label: 'Shine Bright Diamond', scene: SBD_SCENE, hint: '光 明 金剛石 · finale: Diamond*' },
     ],
   },
 ];
@@ -348,6 +353,7 @@ function audioGames(): GameRow[] {
     { label: 'Diamond* Chop Chop', play: (auto) => playImported('karate', auto) },
     { label: 'Power Calligraphy', play: (auto) => playImported('pc', auto) },
     { label: 'Young Stoner Life', hint: 'as Diamond* + Tezzus', play: (auto) => playImported('ysl', auto) },
+    { label: 'Shine Bright Diamond', hint: '光 明 金剛石 · Diamond* finale', play: (auto) => playImported('sbd', auto) },
   ];
 }
 

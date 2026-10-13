@@ -78,6 +78,9 @@ export async function selftest(rt: Runtime, play: (s: string) => Promise<void>):
   const yl = await runLevel(rt, play, 'scene_pc_ysl', 9);
   check('YSL +9f: all barely (late blots)', yl.counts.barely === 32, yl);
   check('Diamond* dancers: all 34 people cels replaced (Tezzus + Diamond*)', rt.data.looks?.['diamond-star']?.raster?.size === 34, rt.data.looks?.['diamond-star']?.raster?.size);
+  // Shine Bright Diamond: 光 明 金 剛 石 + the Diamond* portrait, same slots as the original main.
+  const s0 = await runLevel(rt, play, 'scene_pc_sbd', 0);
+  check('SBD autoplay 0f: every stroke a hit, Superb', s0.counts.hit > 25 && s0.counts.barely + s0.counts.miss === 0 && s0.rank === 'superb', s0);
   const hand = (rt.data.looks?.['diamond-star'] as { stats?: { pixels: number; conflicts: number; uncovered: number; shared: number } } | undefined)?.stats;
   check("Diamond* hand: bracelets in every hand frame, no shared/conflicting tiles", !!hand && hand.pixels > 150 && !hand.conflicts && !hand.shared, hand);
 
