@@ -6,4 +6,6 @@ decomp-cache
 reference/rips
 reference/specs
 reference/handoff
-public/gba/power_calligraphy
+public/lab
+.DS_Store
+art
