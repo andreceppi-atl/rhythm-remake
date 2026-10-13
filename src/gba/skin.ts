@@ -1,3 +1,4 @@
+import { loadImage } from './load-image';
 import type { Cel } from './ppu';
 import type { RasterCel } from './raster-cel';
 
@@ -31,10 +32,9 @@ export async function loadSkin(game: string, id: string, cels: Record<string, Ce
       const name = `cel${String(index).padStart(3, '0')}`;
       const original = cels[`karate_man_${name}`];
       if (!original) throw new Error(`game data has no ${name}`);
-      const image = new Image();
-      image.src = `${base}joe/${name}.png`;
-      try { await image.decode(); } catch { throw new Error(`${name}.png is missing or unreadable`); }
-      if (image.naturalWidth !== CONTRACT.w || image.naturalHeight !== CONTRACT.h) {
+      let image: ImageBitmap;
+      try { image = await loadImage(`${base}joe/${name}.png`); } catch { throw new Error(`${name}.png is missing or unreadable`); }
+      if (image.width !== CONTRACT.w || image.height !== CONTRACT.h) {
         throw new Error(`${name}.png must be 492 × 572 pixels`);
       }
       const full = document.createElement('canvas');

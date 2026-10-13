@@ -153,6 +153,7 @@ async function play(scene: string, auto?: boolean) {
   rt.look = scene === YSL_SCENE || scene === PC_SONG_SCENES.ysl ? 'diamond-star' : null;
   lastScene = scene;
   menu.hidden = true;
+  importPanel.hidden = true; // the song screen, when a game was started from it
   results.hidden = true;
   playing = true;
   await rt.startScene(scene);
@@ -421,6 +422,7 @@ search.onkeydown = (e) => {
   if (e.key === 'Enter') renderSongList()[0]?.open();
   else if (e.key === 'ArrowDown') $('song-list').querySelector<HTMLButtonElement>('button')?.focus();
 };
+renderSongList(); // the originals show right away; built-in songs join when songs/index.json loads
 
 async function loadSongList() {
   try {
@@ -623,7 +625,8 @@ function frame() {
   await ensureGame('karate_man');
   const data = gameCache.get('karate_man')!;
   const skinStatus = $('skin-status');
-  skinStatus.textContent = data.skinWarning ?? (data.skin ? `Playing as ${data.skin.name}` : '');
+  // Chop Chop is always Diamond*, so only a failed skin load is worth a line on the menu.
+  skinStatus.textContent = data.skinWarning ?? '';
   skinStatus.hidden = !skinStatus.textContent;
   skinStatus.setAttribute('role', data.skinWarning ? 'alert' : 'status');
   $('loading').hidden = true;

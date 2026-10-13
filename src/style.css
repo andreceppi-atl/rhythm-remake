@@ -244,6 +244,7 @@ body {
   gap: 2px;
   width: 170px;
   max-height: 58px;
+  flex-shrink: 0;
   overflow-y: auto;
   scrollbar-width: none;
 }
