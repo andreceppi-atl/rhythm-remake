@@ -46,12 +46,14 @@ const store = {
   },
 };
 
-// Integer-scale the 240x160 stage to fit the window.
+// Integer-scale the 240x160 stage to fit the window. Below 2x (phones, small embeds) it scales to fit
+// instead: at 1x the menu text is 7 px. The canvas is drawn at >= 4x, so fractional scales stay sharp.
 function layout() {
-  const s = Math.max(1, Math.floor(Math.min(innerWidth / 240, innerHeight / 160)));
+  const fit = Math.min(innerWidth / 240, innerHeight / 160);
+  const s = fit >= 2 ? Math.floor(fit) : Math.max(0.5, fit);
   stage.style.transform = `scale(${s}) translate(-50%, -50%)`;
   // Canvas pixels = device pixels (at least 4 per GBA pixel), so 4x detail art lands on real pixels.
-  const k = Math.max(4, Math.round(s * (devicePixelRatio || 1)));
+  const k = Math.max(4, Math.ceil(s * (devicePixelRatio || 1)));
   if (canvas.width !== 240 * k) {
     canvas.width = 240 * k;
     canvas.height = 160 * k;
