@@ -16,6 +16,7 @@ import { addShineBrightDiamond, addYoungStonerLife, SBD_SCENE, YSL_SCENE } from 
 import { loadDancerLook, loadHandLook } from './games/power-calligraphy/hand-look';
 import type { PcTuning } from './games/power-calligraphy/tuning';
 import type { GameData } from './gba/assets';
+import { inDiscord, startDiscord } from './discord';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const stage = $('stage');
@@ -619,6 +620,14 @@ function frame() {
 
 // ---- boot ----
 (async () => {
+  if (inDiscord) {
+    $('loading').textContent = 'Signing in with Discord…';
+    try {
+      await startDiscord();
+    } catch (err) {
+      throw new Error(`Discord sign-in failed: ${(err as Error).message}`, { cause: err });
+    }
+  }
   const tuning = await loadTuning(KM_SKIN);
   theme = tuning.theme;
   rt.register(new KarateMan(tuning));
@@ -675,7 +684,7 @@ function frame() {
     } else void play(scene);
   }
 })().catch((err) => {
-  $('loading').textContent = `Failed to load: ${err.message}. Run: npm run convert karate_man`;
+  $('loading').textContent = inDiscord ? err.message : `Failed to load: ${err.message}. Run: npm run convert karate_man`;
   console.error(err);
 });
 
